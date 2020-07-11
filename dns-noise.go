@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-var dbRefreshInterval float64 = 1.0
+var dbRefreshInterval float64 = 24.0
 var dbPath = "/tmp/dns-noise.db"
 var domainsURL = "http://s3-us-west-1.amazonaws.com/umbrella-static/top-1m.csv.zip"
 var piholeRefreshInterval = 60
