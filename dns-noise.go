@@ -1,3 +1,7 @@
+//
+// Copyright 2020 Steven T Black
+//
+
 package main
 
 import (
