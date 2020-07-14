@@ -106,5 +106,10 @@ func unzipFile(zipFile *os.File) *os.File {
 		log.Fatal(err.Error())
 	}
 
+	err = os.Remove(zipFile.Name())
+	if err != nil {
+		log.Printf(err.Error())
+	}
+
 	return unzippedFile
 }
