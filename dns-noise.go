@@ -37,13 +37,14 @@ func init() {
 }
 
 func main() {
+	// Read in all (any) of the command line flags
 	flag.Parse()
 
 	// If reusing existing DB, skip the fetch and data import
 	// Note that this flag only impacts the *initial* fetch & data import cycle
 	// The database will still be refreshed every dbRefreshInterval unless that is also disabled
 	var domainsDb *sql.DB
-	if F.ReuseDatabase {
+	if NoiseFlags.ReuseDatabase {
 		log.Println("Reusing existing domains database")
 		domainsDb = dbOpen(dbPath)
 	} else {
