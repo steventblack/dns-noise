@@ -37,15 +37,13 @@ func init() {
 }
 
 func main() {
-	var reuseDb bool
-	flag.BoolVar(&reuseDb, "reuse", false, "Reuse existing database of noise domains")
 	flag.Parse()
 
 	// If reusing existing DB, skip the fetch and data import
 	// Note that this flag only impacts the *initial* fetch & data import cycle
 	// The database will still be refreshed every dbRefreshInterval unless that is also disabled
 	var domainsDb *sql.DB
-	if reuseDb {
+	if F.ReuseDatabase {
 		log.Println("Reusing existing domains database")
 		domainsDb = dbOpen(dbPath)
 	} else {
