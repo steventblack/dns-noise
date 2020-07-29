@@ -1,8 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
+	"io/ioutil"
 	"log"
+	"os"
 	"time"
 )
 
@@ -13,14 +16,35 @@ type Flags struct {
 	MaxInterval   time.Duration
 }
 
+type Config struct {
+	NoiseDb NoiseDb `json:"noisedb"`
+	Pihole  Pihole  `json:"pihole"`
+}
+
+type NoiseDb struct {
+	Path          string  `json:"dbPath"`
+	RefreshPeriod float64 `json:"dbRefreshPeriod"`
+	Source        string  `json:"dbSource"`
+}
+
+type Pihole struct {
+	PiholeHost      string `json:"phHost"`
+	AuthToken       string `json:"phAuthToken"`
+	QueryTimespan   int    `json:"phQueryTimespan"`
+	FilterHost      string `json:"phFilterHost"`
+	NoisePercentage int    `json:"phNoisePercentage"`
+}
+
 var NoiseFlags *Flags
+var NoiseConfig *Config
 
 //
-// initilize the flags
+// initialize the flags
 //
 func init() {
 	f := new(Flags)
 
+	// set default interval values
 	f.MinInterval, _ = time.ParseDuration("100ms")
 	f.MaxInterval, _ = time.ParseDuration("10000ms")
 
@@ -35,4 +59,22 @@ func init() {
 	// Set public pointer
 	NoiseFlags = f
 	log.Println("Flags successfully initialized")
+}
+
+func loadConfig() {
+	jsonFile, err := os.Open("dns-noise.json")
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	defer jsonFile.Close()
+
+	byteValue, _ := ioutil.ReadAll(jsonFile)
+
+	c := new(Config)
+	err = json.Unmarshal(byteValue, c)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+
+	NoiseConfig = c
 }

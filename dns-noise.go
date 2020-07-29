@@ -39,10 +39,11 @@ func init() {
 func main() {
 	// Read in all (any) of the command line flags
 	flag.Parse()
+	loadConfig()
 
 	// If reusing existing DB, skip the fetch and data import
 	// Note that this flag only impacts the *initial* fetch & data import cycle
-	// The database will still be refreshed every dbRefreshInterval unless that is also disabled
+	// The database will still be refreshed every RefreshPeriod unless that is also disabled
 	var domainsDb *sql.DB
 	if NoiseFlags.ReuseDatabase {
 		log.Println("Reusing existing domains database")
@@ -55,11 +56,12 @@ func main() {
 	dbRefreshTime := time.Now()
 
 	// main loop
-	// referesh the domains database every 24h (dbRefreshInterval) unless refresh disabled
+	// referesh the domains database every 24h (RefreshPeriod) unless refresh disabled
 	for {
-		if (dbRefreshInterval > 0) && (time.Since(dbRefreshTime).Hours() > dbRefreshInterval) {
+		//		if (dbRefreshInterval > 0) && (time.Since(dbRefreshTime).Hours() > dbRefreshInterval) {
+		if (NoiseConfig.NoiseDb.RefreshPeriod > 0) && (time.Since(dbRefreshTime).Hours() > NoiseConfig.NoiseDb.RefreshPeriod) {
 			noiseFile := fetchDomains(domainsURL)
-			domainsDb = dbLoadDomains(dbPath, noiseFile)
+			domainsDb = dbLoadDomains(NoiseConfig.NoiseDb.Path, noiseFile)
 			numDomains = dbNumDomains(domainsDb)
 			dbRefreshTime = time.Now()
 			log.Printf("Refreshed domains database; %d domains available", numDomains)
@@ -87,6 +89,26 @@ func main() {
 	}
 }
 
+/*
+func calcSleepInterval() time.Duration {
+	var numQueries int
+
+	if NoiseConfig.PiholeAuthToken != "" {
+		timeUntil := time.Now().Unix()
+		timeFrom := timeUntil - int64(piholeQueryDuration)
+		numQueries = piholeFetchQueries(timeFrom, timeUntil)
+	}
+
+	// If the sleep duration exceeds the min/max boundaries, then limit it appropriately
+	if sleepDuration < NoiseFlags.MinInterval {
+		sleepDuration = NoiseFlags.MinInterval
+	}
+	if sleepDuration > NoiseFlags.MaxInterval {
+		sleepDuration = NoiseFlags.MaxInterval
+	}
+}
+*/
+
 func calcSleepDuration(traffic, period, noiseLevel int) time.Duration {
 	// keep the math in the defined world
 	if traffic <= 0 {
@@ -96,6 +118,6 @@ func calcSleepDuration(traffic, period, noiseLevel int) time.Duration {
 	// period (in ms) divided by the amount of traffic times the noise level
 	sleepDuration := time.Duration(period*1000/traffic*noiseLevel) * time.Millisecond
 
-	log.Printf("Base sleep time %vms based on %d queries over %ds", sleepDuration.Milliseconds(), traffic, period)
+	log.Printf("Noise query interval %vms based on %d queries over %ds", sleepDuration.Milliseconds(), traffic, period)
 	return sleepDuration
 }

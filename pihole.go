@@ -21,12 +21,10 @@ type PiholeQueries struct {
 	Data [][]string
 }
 
-var piholeHostname = "pihole.springsurprise.com"
-var noiseHostname = "argon.springsurprise.com"
-var piholeAuthToken = "48ca10cf591ee42b02e66a970b25b52fed365102f64840ba6956f69677d55903"
-
 func piholeFetchQueries(from, until int64) int {
-	url := fmt.Sprintf("http://%s/admin/api.php?getAllQueries&from=%d&until=%d&auth=%s", piholeHostname, from, until, piholeAuthToken)
+	// TODO: insert check for auth token here; if absent return 0
+
+	url := fmt.Sprintf("http://%s/admin/api.php?getAllQueries&from=%d&until=%d&auth=%s", NoiseConfig.Pihole.PiholeHost, from, until, NoiseConfig.Pihole.AuthToken)
 
 	response, err := http.Get(url)
 	if err != nil {
@@ -64,7 +62,7 @@ func piholeFetchQueries(from, until int64) int {
 func piholeFilterNoise(queries [][]string) int {
 	var numQueries int
 	for _, query := range queries {
-		if !strings.HasPrefix(query[3], noiseHostname) {
+		if !strings.HasPrefix(query[3], NoiseConfig.Pihole.FilterHost) {
 			numQueries++
 		}
 	}
