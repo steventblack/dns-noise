@@ -24,7 +24,7 @@ type PiholeQueries struct {
 func piholeFetchQueries(from, until int64) int {
 	// TODO: insert check for auth token here; if absent return 0
 
-	url := fmt.Sprintf("http://%s/admin/api.php?getAllQueries&from=%d&until=%d&auth=%s", NoiseConfig.Pihole.PiholeHost, from, until, NoiseConfig.Pihole.AuthToken)
+	url := fmt.Sprintf("http://%s/admin/api.php?getAllQueries&from=%d&until=%d&auth=%s", NoiseConfig.Pihole.Host, from, until, NoiseConfig.Pihole.AuthToken)
 
 	response, err := http.Get(url)
 	if err != nil {
@@ -62,7 +62,7 @@ func piholeFetchQueries(from, until int64) int {
 func piholeFilterNoise(queries [][]string) int {
 	var numQueries int
 	for _, query := range queries {
-		if !strings.HasPrefix(query[3], NoiseConfig.Pihole.FilterHost) {
+		if !strings.HasPrefix(query[3], NoiseConfig.Pihole.Filter) {
 			numQueries++
 		}
 	}

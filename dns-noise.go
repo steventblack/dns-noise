@@ -14,9 +14,6 @@ import (
 	"time"
 )
 
-var dbRefreshInterval float64 = 24.0
-var dbPath = "/tmp/dns-noise.db"
-var domainsURL = "http://s3-us-west-1.amazonaws.com/umbrella-static/top-1m.csv.zip"
 var piholeRefreshInterval = 60
 var piholeQueryDuration = 300
 var noisePercentage = 10
@@ -39,7 +36,7 @@ func init() {
 func main() {
 	// Read in all (any) of the command line flags
 	flag.Parse()
-	loadConfig()
+	loadConfig(NoiseFlags.ConfigFile)
 
 	// If reusing existing DB, skip the fetch and data import
 	// Note that this flag only impacts the *initial* fetch & data import cycle
@@ -47,24 +44,19 @@ func main() {
 	var domainsDb *sql.DB
 	if NoiseFlags.ReuseDatabase {
 		log.Println("Reusing existing domains database")
-		domainsDb = dbOpen(dbPath)
+		domainsDb = dbOpen(NoiseConfig.Noise.NoisePath)
 	} else {
-		noiseFile := fetchDomains(domainsURL)
-		domainsDb = dbLoadDomains(dbPath, noiseFile)
+		noiseFile := fetchDomains(NoiseConfig.Sources[0].Url)
+		domainsDb = dbLoadDomains(NoiseConfig.Noise.NoisePath, noiseFile)
 	}
 	numDomains = dbNumDomains(domainsDb)
-	dbRefreshTime := time.Now()
 
 	// main loop
-	// referesh the domains database every 24h (RefreshPeriod) unless refresh disabled
 	for {
-		//		if (dbRefreshInterval > 0) && (time.Since(dbRefreshTime).Hours() > dbRefreshInterval) {
-		if (NoiseConfig.NoiseDb.RefreshPeriod > 0) && (time.Since(dbRefreshTime).Hours() > NoiseConfig.NoiseDb.RefreshPeriod) {
-			noiseFile := fetchDomains(domainsURL)
-			domainsDb = dbLoadDomains(NoiseConfig.NoiseDb.Path, noiseFile)
+		// periodically check to see if sources need to be refreshed
+		// if there was a change, recompute the numDomains available
+		if refreshSources(NoiseConfig.Sources) {
 			numDomains = dbNumDomains(domainsDb)
-			dbRefreshTime = time.Now()
-			log.Printf("Refreshed domains database; %d domains available", numDomains)
 		}
 
 		var timeUntil = time.Now().Unix()
@@ -88,26 +80,6 @@ func main() {
 		}
 	}
 }
-
-/*
-func calcSleepInterval() time.Duration {
-	var numQueries int
-
-	if NoiseConfig.PiholeAuthToken != "" {
-		timeUntil := time.Now().Unix()
-		timeFrom := timeUntil - int64(piholeQueryDuration)
-		numQueries = piholeFetchQueries(timeFrom, timeUntil)
-	}
-
-	// If the sleep duration exceeds the min/max boundaries, then limit it appropriately
-	if sleepDuration < NoiseFlags.MinInterval {
-		sleepDuration = NoiseFlags.MinInterval
-	}
-	if sleepDuration > NoiseFlags.MaxInterval {
-		sleepDuration = NoiseFlags.MaxInterval
-	}
-}
-*/
 
 func calcSleepDuration(traffic, period, noiseLevel int) time.Duration {
 	// keep the math in the defined world

@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // General functions for fetching the list of DNS domains to be used as noise values.
@@ -112,4 +113,44 @@ func unzipFile(zipFile *os.File) *os.File {
 	}
 
 	return unzippedFile
+}
+
+//
+// Check the source to see if it has exceeded its refresh period
+//
+func checkSourceRefresh(s *Source) bool {
+	// if timestamp hasn't been initialized, set it to current time
+	if s.Timestamp.IsZero() {
+		s.Timestamp = time.Now()
+		log.Printf("Initialized source '%s' refresh to %v", s.Label, s.Timestamp)
+	}
+
+	// if refresh 0 then always false, else check if timestamp exceeds duration
+	if s.Refresh == 0 {
+		return false
+	} else if time.Since(s.Timestamp) > time.Duration(s.Refresh) {
+		log.Printf("Refreshing domains source '%s'", s.Label)
+		return true
+	}
+
+	return false
+}
+
+//
+// refresh any domain sources that are eligible
+// returns true if any were updated
+//
+func refreshSources(sources []Source) bool {
+	refreshed := false
+
+	for i := range sources {
+		if checkSourceRefresh(&sources[i]) {
+			sourceFile := fetchDomains(sources[i].Url)
+			dbLoadDomains(NoiseConfig.Noise.NoisePath, sourceFile)
+			sources[i].Timestamp = time.Now()
+			refreshed = true
+		}
+	}
+
+	return refreshed
 }
