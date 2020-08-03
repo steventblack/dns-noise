@@ -14,16 +14,11 @@ import (
 	"time"
 )
 
-var piholeRefreshInterval = 60
-var piholeQueryDuration = 300
-var noisePercentage = 10
 var numDomains int
-var numQueries int
 
 //
 // Initializer for rand
 // Generates a better seed value than simply relying on a time value
-//
 func init() {
 	var b [8]byte
 	_, err := crypto_rand.Read(b[:])
@@ -44,10 +39,10 @@ func main() {
 	var domainsDb *sql.DB
 	if NoiseFlags.ReuseDatabase {
 		log.Println("Reusing existing domains database")
-		domainsDb = dbOpen(NoiseConfig.Noise.NoisePath)
+		domainsDb = dbOpen(NoiseConfig.Noise.DbPath)
 	} else {
 		noiseFile := fetchDomains(NoiseConfig.Sources[0].Url)
-		domainsDb = dbLoadDomains(NoiseConfig.Noise.NoisePath, noiseFile)
+		domainsDb = dbLoadDomains(NoiseConfig.Noise.DbPath, noiseFile)
 	}
 	numDomains = dbNumDomains(domainsDb)
 
@@ -59,37 +54,52 @@ func main() {
 			numDomains = dbNumDomains(domainsDb)
 		}
 
-		var timeUntil = time.Now().Unix()
-		var timeFrom = timeUntil - int64(piholeQueryDuration)
-		numQueries = piholeFetchQueries(timeFrom, timeUntil)
-		sleepDuration := calcSleepDuration(numQueries, piholeQueryDuration, noisePercentage)
+		// fetch a random domain and issue a DNS query
+		piholeLookupDomain(dbGetRandomDomain(domainsDb))
 
-		// inner loop; lookup random domains and sleep a bit in between calls
-		// break to main loop when time exceeds pihole refresh interval
-		for {
-			if time.Since(time.Unix(timeUntil, 0)).Seconds() > float64(piholeRefreshInterval) {
-				break
-			}
-
-			piholeLookupDomain(dbGetRandomDomain(domainsDb))
-
-			// add a bit of randomness between calls to increase the "noisiness"
-			// this should generate a random number of ms from 0 to 10% of the sleepDuration value
-			sleepDelta := time.Duration(math_rand.Int63n(sleepDuration.Milliseconds()/10)) * time.Millisecond
-			time.Sleep(sleepDuration + sleepDelta)
-		}
+		// sleep between calls to moderate the query rate
+		time.Sleep(calcSleepPeriod(NoiseConfig))
 	}
 }
 
-func calcSleepDuration(traffic, period, noiseLevel int) time.Duration {
-	// keep the math in the defined world
-	if traffic <= 0 {
-		traffic = 1
+// calcSleepPeriod determines an appropriate sleep duration between noise queries.
+// If a pihole is properly configured, it will use a percentage of the live traffic rate as the basis.
+// The pihole activity rate will be adjusted to fall within the min/max period if necessary.
+// If a pihole is not configured, a random value between the min and max period will be generated.
+// For additional obfuscation, a random value between 0-10% of the raw sleep period for each call will be added.
+func calcSleepPeriod(c *Config) time.Duration {
+	var sleepPeriod time.Duration
+
+	if c.Pihole.Enabled {
+		if time.Since(c.Pihole.Timestamp) > c.Pihole.Refresh {
+			if c.Pihole.Timestamp.IsZero() {
+				log.Println("Initialized pihole timestamp")
+				c.Pihole.Timestamp = time.Now()
+			}
+
+			// TODO: make sure numQueries never returns 0 else div/0 error will occur
+			numQueries := piholeFetchActivity(&c.Pihole)
+			log.Printf("Refreshed pihole activity data; %d queries", numQueries)
+			c.Pihole.SleepPeriod = time.Duration(int64(c.Pihole.ActivityPeriod) * int64(c.Pihole.NoisePercentage) / int64(numQueries))
+
+			// if the interval time calculate by pihole activity exceeds limits, then cap appropriately
+			if c.Pihole.SleepPeriod > c.Noise.MaxPeriod {
+				c.Pihole.SleepPeriod = c.Noise.MaxPeriod
+			} else if c.Pihole.SleepPeriod < c.Noise.MinPeriod {
+				c.Pihole.SleepPeriod = c.Noise.MinPeriod
+			}
+
+			c.Pihole.Timestamp = time.Now()
+		}
+
+		sleepPeriod = c.Pihole.SleepPeriod
+	} else {
+		sleepRange := int64(c.Noise.MaxPeriod - c.Noise.MinPeriod)
+		sleepPeriod = time.Duration(math_rand.Int63n(sleepRange)) + c.Noise.MinPeriod
 	}
 
-	// period (in ms) divided by the amount of traffic times the noise level
-	sleepDuration := time.Duration(period*1000/traffic*noiseLevel) * time.Millisecond
+	sleepDelta := time.Duration(math_rand.Int63n(sleepPeriod.Milliseconds()/10)) * time.Millisecond
 
-	log.Printf("Noise query interval %vms based on %d queries over %ds", sleepDuration.Milliseconds(), traffic, period)
-	return sleepDuration
+	log.Printf("Sleeping %v + %v", sleepPeriod, sleepDelta)
+	return sleepPeriod + sleepDelta
 }

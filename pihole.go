@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"time"
 )
 
 // Example response from Pihole
@@ -21,9 +22,65 @@ type PiholeQueries struct {
 	Data [][]string
 }
 
-func piholeFetchQueries(from, until int64) int {
-	// TODO: insert check for auth token here; if absent return 0
+// piholeFetchActivity polls the configured pihole for query activity.
+// It accepts the pihole configuration information block and returns the number of queries observed.
+// On error, it returns a value of 0.
+func piholeFetchActivity(p *Pihole) int {
+	until := time.Now().Unix()
+	from := until - int64(p.ActivityPeriod.Seconds())
 
+	// Time values need to be expressed in Unix epoch time format
+	url := fmt.Sprintf("http://%s/admin/api.php?getAllQueries&from=%d&until=%d&auth=%s", p.Host, from, until, p.AuthToken)
+
+	response, err := http.Get(url)
+	defer response.Body.Close()
+	if err != nil {
+		log.Printf("Unable to fetch activity data from '%s'; status: '%s'", p.Host, response.Status)
+		return 0
+	}
+
+	if response.StatusCode != http.StatusOK {
+		log.Printf("Unexpected status from '%s'; status '%s'", p.Host, response.Status)
+		return 0
+	}
+
+	jsonBody, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		log.Printf("Unable to read pihole response; %v", err.Error())
+		return 0
+	}
+
+	var queries PiholeQueries
+	err = json.Unmarshal(jsonBody, &queries)
+	if err != nil {
+		log.Printf("Unable to unmarshal pihole response; %v", err.Error())
+		return 0
+	}
+
+	// Filters out entries from dns-noise host (if applicable)
+	return piholeFilterNoise(p.Filter, queries.Data)
+}
+
+// piholeFilterNoise removes the queries from the filtered host from the query activity total.
+// If the filter string is empty, then it simply returns the number of queries in the set.
+// It returns the adjusted total number of queries in the set.
+func piholeFilterNoise(filter string, queries [][]string) int {
+	if filter == "" {
+		return len(queries)
+	}
+
+	var numQueries int
+	for _, query := range queries {
+		if !strings.HasPrefix(query[3], filter) {
+			numQueries++
+		}
+	}
+
+	return numQueries
+}
+
+/*
+func piholeFetchQueries(from, until int64) int {
 	url := fmt.Sprintf("http://%s/admin/api.php?getAllQueries&from=%d&until=%d&auth=%s", NoiseConfig.Pihole.Host, from, until, NoiseConfig.Pihole.AuthToken)
 
 	response, err := http.Get(url)
@@ -74,6 +131,7 @@ func piholeFilterNoise(queries [][]string) int {
 
 	return numQueries
 }
+*/
 
 //
 // Query the pihole using the provided domain and query type

@@ -146,7 +146,7 @@ func refreshSources(sources []Source) bool {
 	for i := range sources {
 		if checkSourceRefresh(&sources[i]) {
 			sourceFile := fetchDomains(sources[i].Url)
-			dbLoadDomains(NoiseConfig.Noise.NoisePath, sourceFile)
+			dbLoadDomains(NoiseConfig.Noise.DbPath, sourceFile)
 			sources[i].Timestamp = time.Now()
 			refreshed = true
 		}

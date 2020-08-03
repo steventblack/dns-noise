@@ -12,6 +12,7 @@ import (
 
 type Flags struct {
 	ConfigFile    string
+	DbPath        string
 	ReuseDatabase bool
 	MinPeriod     time.Duration
 	MaxPeriod     time.Duration
@@ -24,33 +25,41 @@ type Config struct {
 }
 
 type Noise struct {
-	NoisePath string   `json:"noisePath"`
-	MinPeriod Duration `json:"minPeriod"`
-	MaxPeriod Duration `json:"maxPeriod"`
+	DbPath       string   `json:"dbPath"`
+	Refresh      Duration `json:"refresh"`
+	MinPeriodRaw Duration `json:"minPeriod"`
+	MaxPeriodRaw Duration `json:"maxPeriod"`
+	MinPeriod    time.Duration
+	MaxPeriod    time.Duration
 }
 
 type Source struct {
-	Label     string   `json:"label"`
-	Url       string   `json:"url"`
-	Refresh   Duration `json:"refresh"`
-	Timestamp time.Time
+	Label      string   `json:"label"`
+	Url        string   `json:"url"`
+	RefreshRaw Duration `json:"refresh"`
+	Refresh    time.Duration
+	Timestamp  time.Time
 }
 
 type Pihole struct {
-	Host            string   `json:"host"`
-	AuthToken       string   `json:"authToken"`
-	ActivityPeriod  Duration `json:"activityPeriod"`
-	Refresh         Duration `json:"refresh"`
-	Filter          string   `json:"filter"`
-	NoisePercentage int      `json:"noisePercentage"`
+	Host              string   `json:"host"`
+	AuthToken         string   `json:"authToken"`
+	ActivityPeriodRaw Duration `json:"activityPeriod"`
+	RefreshRaw        Duration `json:"refresh"`
+	Filter            string   `json:"filter"`
+	NoisePercentage   int      `json:"noisePercentage"`
+	Enabled           bool
+	ActivityPeriod    time.Duration
+	Refresh           time.Duration
+	Timestamp         time.Time
+	SleepPeriod       time.Duration
 }
 
 var NoiseFlags *Flags
 var NoiseConfig *Config
 
-//
-// initialize the flags
-//
+// init establishes the flag set and initializes the flags to their default values.
+// These values will be replaced if an explicit flag is passed on the command line.
 func init() {
 	f := new(Flags)
 
@@ -63,6 +72,8 @@ func init() {
 	flag.BoolVar(&f.ReuseDatabase, "r", false, "Reuse existing noise database (shorthand)")
 	flag.StringVar(&f.ConfigFile, "conf", "dns-noise.json", "Path to configuration file")
 	flag.StringVar(&f.ConfigFile, "c", "dns-noise.json", "Path to configuration file (shorthand)")
+	flag.StringVar(&f.DbPath, "database", "/tmp/dns-noise.db", "Path to noise database file")
+	flag.StringVar(&f.DbPath, "d", "/tmp/dns-noise.db", "Path to noise database file (shorthand)")
 	flag.DurationVar(&f.MinPeriod, "min", f.MinPeriod, "Minimum time period for issuing noise queries")
 	flag.DurationVar(&f.MaxPeriod, "max", f.MaxPeriod, "Maximum time period for issuing noise queries")
 
@@ -71,9 +82,8 @@ func init() {
 	log.Println("Flags successfully initialized")
 }
 
-//
-// Check to see if a flag was explicitly passed. This can then be used to override the equivalent value in the config (if applicable)
-//
+// isFlagPassed checks to see if the named flag was explicitly passed on the command line or not.
+// It returns a bool reflecting whether is was passed or not.
 func isFlagPassed(flagName string) bool {
 	found := false
 	flag.Visit(func(f *flag.Flag) {
@@ -85,9 +95,8 @@ func isFlagPassed(flagName string) bool {
 	return found
 }
 
-//
-// load the config from the json file
-//
+// loadConfig reads in and parses the named file for the configuration values.
+// The file is expected to be in JSON format. Command line flags will overwrite the values (if any) found in the configuration.
 func loadConfig(confFile string) {
 	jsonFile, err := os.Open(confFile)
 	if err != nil {
@@ -103,18 +112,67 @@ func loadConfig(confFile string) {
 		log.Fatal(err.Error())
 	}
 
+	// checks to see if necessary elements for Pihole access are present
+	c.Pihole.Enabled = piholeEnabled(&c.Pihole)
+
+	// proactively convert types to avoid having to explicitly typecast everywhere else in code
+	c.Noise.MinPeriod = time.Duration(c.Noise.MinPeriodRaw)
+	c.Noise.MaxPeriod = time.Duration(c.Noise.MaxPeriodRaw)
+	c.Pihole.ActivityPeriod = time.Duration(c.Pihole.ActivityPeriodRaw)
+	c.Pihole.Refresh = time.Duration(c.Pihole.RefreshRaw)
+	for i := range c.Sources {
+		c.Sources[i].Refresh = time.Duration(c.Sources[i].RefreshRaw)
+	}
+
+	// overwrite config vars that were set explicitly with a command-line flag
+	if isFlagPassed("min") {
+		c.Noise.MinPeriod = NoiseFlags.MinPeriod
+	}
+	if isFlagPassed("max") {
+		c.Noise.MaxPeriod = NoiseFlags.MaxPeriod
+	}
+	if isFlagPassed("database") || isFlagPassed("d") {
+		c.Noise.DbPath = NoiseFlags.DbPath
+	}
+
+	// bad config! no soup for you!
+	if c.Noise.MinPeriod > c.Noise.MaxPeriod {
+		log.Fatal("Min period exceeds max period")
+	}
+
 	NoiseConfig = c
 }
 
-//
-// Interface functions for custom JSON handling of time.Duration fields
-//
+// piholeEnabled checks the necessary settings are present in the config for pihole utilization.
+// It does not perform any validation checks on the setting values.
+// It returns a bool reflecting the configuration is setup or not.
+func piholeEnabled(p *Pihole) bool {
+	enabled := true
+
+	if p.Host == "" {
+		enabled = false
+	}
+	if p.AuthToken == "" {
+		enabled = false
+	}
+	if p.NoisePercentage <= 0 {
+		enabled = false
+	}
+
+	return enabled
+}
+
+// Duration provides a type enabling the JSON module to process strings as time.Durations.
 type Duration time.Duration
 
+// MarshalJSON supplies an interface for processing Duration values, which wrap the standard time.Duration type.
+// It returns a byte array and any error encountered.
 func (d Duration) MarshalJSON() ([]byte, error) {
 	return json.Marshal(time.Duration(d).String())
 }
 
+// UnmarshalJSON supplies an interface for processing Duration values, which wrap the standard time.Duration type.
+// It accepts a byte array and returns any error encountered.
 func (d *Duration) UnmarshalJSON(b []byte) error {
 	var v interface{}
 	err := json.Unmarshal(b, &v)
