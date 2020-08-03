@@ -21,7 +21,6 @@ import (
 // Fetch the domains, unzipping if needed
 // The domains file must be either a csv or a zip-encoded csv
 // Returns back a file pointer to the csv
-//
 func fetchDomains(sourceURL string) *os.File {
 	domainsFile := fetchFile(sourceURL)
 

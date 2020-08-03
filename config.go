@@ -165,13 +165,13 @@ func piholeEnabled(p *Pihole) bool {
 // Duration provides a type enabling the JSON module to process strings as time.Durations.
 type Duration time.Duration
 
-// MarshalJSON supplies an interface for processing Duration values, which wrap the standard time.Duration type.
+// MarshalJSON supplies an interface for processing Duration values which wrap the standard time.Duration type.
 // It returns a byte array and any error encountered.
 func (d Duration) MarshalJSON() ([]byte, error) {
 	return json.Marshal(time.Duration(d).String())
 }
 
-// UnmarshalJSON supplies an interface for processing Duration values, which wrap the standard time.Duration type.
+// UnmarshalJSON supplies an interface for processing Duration values which wrap the standard time.Duration type.
 // It accepts a byte array and returns any error encountered.
 func (d *Duration) UnmarshalJSON(b []byte) error {
 	var v interface{}

@@ -79,60 +79,6 @@ func piholeFilterNoise(filter string, queries [][]string) int {
 	return numQueries
 }
 
-/*
-func piholeFetchQueries(from, until int64) int {
-	url := fmt.Sprintf("http://%s/admin/api.php?getAllQueries&from=%d&until=%d&auth=%s", NoiseConfig.Pihole.Host, from, until, NoiseConfig.Pihole.AuthToken)
-
-	response, err := http.Get(url)
-	if err != nil {
-		log.Fatal("Unable to fetch query data from pihole; status: '%s'", response.Status)
-	}
-	defer response.Body.Close()
-
-	if response.StatusCode != http.StatusOK {
-		log.Fatal("Unexpected status fetching query data from pihole; status: '%s'", response.Status)
-	}
-
-	jsonBody, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-
-	var queries PiholeQueries
-	err = json.Unmarshal(jsonBody, &queries)
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-
-	numQueries := piholeFilterNoise(queries.Data)
-	log.Printf("Retrieved pihole activity: %d queries", numQueries)
-
-	return numQueries
-}
-
-//
-// Filters out queries that were generated as part of noise
-// Returns the number of "legitimate" DNS queries during the period
-// Assumes noise generating system doesn't make significant amount of legitimate DNS queries
-// Somewhat brittle implementation; the pihole API response doesn't have a lot of structure
-//
-func piholeFilterNoise(queries [][]string) int {
-	var numQueries int
-	for _, query := range queries {
-		if !strings.HasPrefix(query[3], NoiseConfig.Pihole.Filter) {
-			numQueries++
-		}
-	}
-
-	// Safety measure in case no traffic found
-	if numQueries == 0 {
-		numQueries = 1
-	}
-
-	return numQueries
-}
-*/
-
 //
 // Query the pihole using the provided domain and query type
 //
