@@ -25,7 +25,7 @@ type PiholeQueries struct {
 // piholeFetchActivity polls the configured pihole for query activity.
 // It accepts the pihole configuration information block and returns the number of queries observed.
 // On error, it returns a value of 0.
-func piholeFetchActivity(p *Pihole) int {
+func piholeFetchActivity(p *Pihole) (int, error) {
 	until := time.Now().Unix()
 	from := until - int64(p.ActivityPeriod.Seconds())
 
@@ -35,30 +35,31 @@ func piholeFetchActivity(p *Pihole) int {
 	response, err := http.Get(url)
 	defer response.Body.Close()
 	if err != nil {
-		log.Printf("Unable to fetch activity data from '%s'; status: '%s'", p.Host, response.Status)
-		return 0
+		return 0, fmt.Errorf("Unable to fetch activity data from '%s'; status '%s'", p.Host, response.Status)
 	}
 
 	if response.StatusCode != http.StatusOK {
-		log.Printf("Unexpected status from '%s'; status '%s'", p.Host, response.Status)
-		return 0
+		return 0, fmt.Errorf("Unexpected status  from '%s'; status '%s'", p.Host, response.Status)
 	}
 
 	jsonBody, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		log.Printf("Unable to read pihole response; %v", err.Error())
-		return 0
+		return 0, err
 	}
 
 	var queries PiholeQueries
 	err = json.Unmarshal(jsonBody, &queries)
 	if err != nil {
-		log.Printf("Unable to unmarshal pihole response; %v", err.Error())
-		return 0
+		return 0, err
 	}
 
 	// Filters out entries from dns-noise host (if applicable)
-	return piholeFilterNoise(p.Filter, queries.Data)
+	numQueries := piholeFilterNoise(p.Filter, queries.Data)
+	if numQueries <= 0 {
+		return 0, fmt.Errorf("No activity available from pihole")
+	}
+
+	return numQueries, nil
 }
 
 // piholeFilterNoise removes the queries from the filtered host from the query activity total.
@@ -79,9 +80,7 @@ func piholeFilterNoise(filter string, queries [][]string) int {
 	return numQueries
 }
 
-//
 // Query the pihole using the provided domain and query type
-//
 func piholeLookupDomain(domain string) {
 	if domain == "" {
 		log.Println("Cannot lookup empty domain; skipping")

@@ -78,9 +78,13 @@ func calcSleepPeriod(c *Config) time.Duration {
 			}
 
 			// TODO: make sure numQueries never returns 0 else div/0 error will occur
-			numQueries := piholeFetchActivity(&c.Pihole)
+			numQueries, err := piholeFetchActivity(&c.Pihole)
 			log.Printf("Refreshed pihole activity data; %d queries", numQueries)
-			c.Pihole.SleepPeriod = time.Duration(int64(c.Pihole.ActivityPeriod) * int64(c.Pihole.NoisePercentage) / int64(numQueries))
+			if err != nil {
+				c.Pihole.SleepPeriod = time.Duration(0)
+			} else {
+				c.Pihole.SleepPeriod = time.Duration(int64(c.Pihole.ActivityPeriod) * int64(c.Pihole.NoisePercentage) / int64(numQueries))
+			}
 
 			// if the interval time calculate by pihole activity exceeds limits, then cap appropriately
 			if c.Pihole.SleepPeriod > c.Noise.MaxPeriod {
