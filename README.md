@@ -13,7 +13,8 @@ The noise generated from this service can obfuscate typical attempts to identify
 a determined party may still be able to differentiate the noise from legitimate traffic given enough time, activity logs, and effort.
 
 ## Running ##
-```dns-noise [-c|--conf confpath] [-d|--database dbpath] [-r|--reusedb] --min min_interval --max max_interval
+```
+dns-noise [-c|--conf confpath] [-d|--database dbpath] [-r|--reusedb] --min min_interval --max max_interval
 -c|--conf confpath
   Specifies the path to the configuration file. 
   Default path is "dns-noise.conf".
