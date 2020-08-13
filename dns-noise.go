@@ -77,7 +77,7 @@ func calcSleepPeriod(c *Config) time.Duration {
 				c.Pihole.Timestamp = time.Now()
 			}
 
-			// TODO: make sure numQueries never returns 0 else div/0 error will occur
+			// if no activity, an error will be returned
 			numQueries, err := piholeFetchActivity(&c.Pihole)
 			log.Printf("Refreshed pihole activity data; %d queries", numQueries)
 			if err != nil {
@@ -104,6 +104,5 @@ func calcSleepPeriod(c *Config) time.Duration {
 
 	sleepDelta := time.Duration(math_rand.Int63n(sleepPeriod.Milliseconds()/10)) * time.Millisecond
 
-	log.Printf("Sleeping %v + %v", sleepPeriod, sleepDelta)
 	return sleepPeriod + sleepDelta
 }
