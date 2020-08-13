@@ -1,8 +1,8 @@
 # Supported platforms
-PLATFORMS := darwin/386 darwin/amd64
+PLATFORMS := $(shell go tool dist list | grep -v arm$)
 
 # ARM-based platforms and instruction set versions support
-ARM_PLATFORMS := linux/arm
+ARM_PLATFORMS := $(shell go tool dist list | grep arm$)
 ARM_VERSIONS := 6 7
 
 # Assign operating system and architecture
