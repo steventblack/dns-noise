@@ -33,10 +33,10 @@ func piholeFetchActivity(p *Pihole) (int, error) {
 	url := fmt.Sprintf("http://%s/admin/api.php?getAllQueries&from=%d&until=%d&auth=%s", p.Host, from, until, p.AuthToken)
 
 	response, err := http.Get(url)
-	defer response.Body.Close()
 	if err != nil {
 		return 0, fmt.Errorf("Unable to fetch activity data from '%s'; status '%s'", p.Host, response.Status)
 	}
+	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
 		return 0, fmt.Errorf("Unexpected status  from '%s'; status '%s'", p.Host, response.Status)
