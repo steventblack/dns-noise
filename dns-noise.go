@@ -32,6 +32,7 @@ func main() {
 	// Read in all (any) of the command line flags
 	flag.Parse()
 	loadConfig(NoiseFlags.ConfigFile)
+	dnsServerConfig(NoiseConfig.NameServers)
 
 	// If reusing existing DB, skip the fetch and data import
 	// Note that this flag only impacts the *initial* fetch & data import cycle
@@ -55,7 +56,8 @@ func main() {
 		}
 
 		// fetch a random domain and issue a DNS query
-		piholeLookupDomain(dbGetRandomDomain(domainsDb))
+		//		piholeLookupDomain(dbGetRandomDomain(domainsDb))
+		dnsLookup(dbGetRandomDomain(domainsDb), "A")
 
 		// sleep between calls to moderate the query rate
 		time.Sleep(calcSleepPeriod(NoiseConfig))
@@ -79,7 +81,7 @@ func calcSleepPeriod(c *Config) time.Duration {
 
 			// if no activity, an error will be returned
 			numQueries, err := piholeFetchActivity(&c.Pihole)
-			log.Printf("Refreshed pihole activity data; %d queries", numQueries)
+			log.Printf("Refreshed pihole activity data; %.2f qps", float64(numQueries)/c.Pihole.ActivityPeriod.Seconds())
 			if err != nil {
 				c.Pihole.SleepPeriod = time.Duration(0)
 			} else {

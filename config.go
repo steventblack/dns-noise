@@ -19,9 +19,16 @@ type Flags struct {
 }
 
 type Config struct {
-	Noise   Noise    `json:"noise"`
-	Sources []Source `json:"sources"`
-	Pihole  Pihole   `json:"pihole"`
+	NameServers []NameServer `json:"nameservers"`
+	Noise       Noise        `json:"noise"`
+	Sources     []Source     `json:"sources"`
+	Pihole      Pihole       `json:"pihole"`
+}
+
+type NameServer struct {
+	Ip   string `json:"ip"`
+	Zone string `json:"zone"`
+	Port int    `json:"port"`
 }
 
 type Noise struct {
