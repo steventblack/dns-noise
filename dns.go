@@ -10,6 +10,7 @@ import (
 	"log"
 	"net"
 	"reflect"
+	"strings"
 )
 
 // dnsServers contain the address(es) of the DNS servers to query.
@@ -38,14 +39,14 @@ func dnsServerConfig(ns []NameServer) {
 // The query strings are appended in the order defined in the Nameserver struct.
 func dnsStatedClientConfig(ns []NameServer) ([]string, error) {
 	if ns == nil {
-		return nil, fmt.Errorf("No configuration data for nameserver")
+		return nil, fmt.Errorf("No configuration data for nameserver; running defaults")
 	}
 
 	var servers []string
 	for _, nsentry := range ns {
-		ip := net.ParseIP(nsentry.Ip)
-		if ip == nil {
-			log.Printf("Invalid IP address in nameserver configuration: %v", nsentry.Ip)
+		ip, err := dnsFormatIP(nsentry.Ip, nsentry.Zone)
+		if err != nil {
+			log.Printf("Unrecognized nameserver IP address format: '%v'", nsentry.Ip)
 			continue
 		}
 
@@ -54,18 +55,7 @@ func dnsStatedClientConfig(ns []NameServer) ([]string, error) {
 			nsentry.Port = 53
 		}
 
-		// if dealing w/ an IPv6 address, need to wrap it in '[]' in order to protect the ':port' suffix from causing a parsing error.
-		var hostport string
-		if ip.To4() == nil {
-			if nsentry.Zone == "" {
-				hostport = fmt.Sprintf("[%s]:%d", ip.String(), nsentry.Port)
-			} else {
-				hostport = fmt.Sprintf("[%s%%%s]:%d", ip.String(), nsentry.Zone, nsentry.Port)
-			}
-		} else {
-			hostport = fmt.Sprintf("%s:%d", ip.String(), nsentry.Port)
-		}
-
+		hostport := fmt.Sprintf("%s:%d", ip, nsentry.Port)
 		log.Printf("configured hostport: '%s'", hostport)
 
 		servers = append(servers, hostport)
@@ -90,12 +80,53 @@ func dnsDefaultClientConfig() ([]string, error) {
 	}
 
 	var servers []string
-	for _, host := range conf.Servers {
-		hostport := host + ":" + conf.Port
+	for _, nsentry := range conf.Servers {
+		ip, err := dnsFormatIP(nsentry, "")
+		if err != nil {
+			log.Printf("Unrecognized nameserver IP address format: '%v'", nsentry)
+			continue
+		}
+
+		hostport := fmt.Sprintf("%s:%s", ip, conf.Port)
+		log.Printf("configured hostport: '%s'", hostport)
+
 		servers = append(servers, hostport)
 	}
 
 	return servers, nil
+}
+
+// dnsFormatIP attempts to parse out the IP address and, if present, the zone field from the string supplied.
+// It can parse either an IPv4 or IPv6 address and returns a string suitable for specifying a DNS server address
+// including a zone specification if present. IPv6 addresses will be wrapped with brackets ("[]") as convention.
+// If an IPv6 address is passed with a zone already appended, the zone will be preserved.
+// If an IPv6 address is passed with a valid zone string, the zone will be appended unless a zone is already specified as part of the ipaddr.
+// If an error is encountered, it returns the error with an empty string
+func dnsFormatIP(ipaddr, zone string) (string, error) {
+	// IPv6 addresses *may* already contain a zone field appended
+	// Need to separate that out as net.ParseIP won't recognize an IPv6 address with a zone.
+	components := strings.Split(ipaddr, "%")
+
+	// If a zone is specified in the ipaddr, override the zone parameter to preserve the original value.
+	if len(components) > 1 {
+		zone = components[1]
+	}
+
+	ip := net.ParseIP(components[0])
+	if ip == nil {
+		return "", fmt.Errorf("Invalid IP address format: '%v'", components[0])
+	}
+
+	formattedIP := ip.String()
+	if ip.To4() == nil {
+		if zone == "" {
+			formattedIP = fmt.Sprintf("[%s]", ip.String())
+		} else {
+			formattedIP = fmt.Sprintf("[%s%%%s]", ip.String(), zone)
+		}
+	}
+
+	return formattedIP, nil
 }
 
 // dnsLookup performs a dns query for the domain and type specified.
@@ -147,16 +178,16 @@ func dnsQuery(q *dns.Msg, d string) (*dns.Msg, error) {
 		switch a.(type) {
 		case *dns.A:
 			rr := a.(*dns.A)
-			log.Printf("%v: %v; %v", dns.TypeToString[rr.Header().Rrtype], rr.A, dns.RcodeToString[r.Rcode])
+			log.Printf("%v: %v->%v; %v", dns.TypeToString[rr.Header().Rrtype], q.Question[0].Name, rr.A, dns.RcodeToString[r.Rcode])
 		case *dns.AAAA:
 			rr := a.(*dns.AAAA)
-			log.Printf("%v: %v; %v", dns.TypeToString[rr.Header().Rrtype], rr.AAAA, dns.RcodeToString[r.Rcode])
+			log.Printf("%v: %v->%v; %v", dns.TypeToString[rr.Header().Rrtype], q.Question[0].Name, rr.AAAA, dns.RcodeToString[r.Rcode])
 		case *dns.CNAME:
 			rr := a.(*dns.CNAME)
-			log.Printf("%v: %v; %v", dns.TypeToString[rr.Header().Rrtype], rr.Target, dns.RcodeToString[r.Rcode])
+			log.Printf("%v: %v->%v; %v", dns.TypeToString[rr.Header().Rrtype], q.Question[0].Name, rr.Target, dns.RcodeToString[r.Rcode])
 		case *dns.MX:
 			rr := a.(*dns.MX)
-			log.Printf("%v: %v; %v", dns.TypeToString[rr.Header().Rrtype], rr.Mx, dns.RcodeToString[r.Rcode])
+			log.Printf("%v: %v->%v; %v", dns.TypeToString[rr.Header().Rrtype], q.Question[0].Name, rr.Mx, dns.RcodeToString[r.Rcode])
 		default:
 			log.Printf("%v: Unexpected answer type", reflect.TypeOf(a))
 		}
