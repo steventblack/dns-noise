@@ -79,19 +79,3 @@ func piholeFilterNoise(filter string, queries [][]string) int {
 
 	return numQueries
 }
-
-// Query the pihole using the provided domain and query type
-func piholeLookupDomain(domain string) {
-	if domain == "" {
-		log.Println("Cannot lookup empty domain; skipping")
-		return
-	}
-
-	_, err := net.LookupHost(domain)
-
-	// Lookup failures are expected as the pihole blocks a number of ad and tracker domains
-	// Log them anyway in case something unexpected is returned
-	if err != nil {
-		log.Println(err.Error())
-	}
-}

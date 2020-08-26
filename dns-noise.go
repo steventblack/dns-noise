@@ -56,7 +56,6 @@ func main() {
 		}
 
 		// fetch a random domain and issue a DNS query
-		//		piholeLookupDomain(dbGetRandomDomain(domainsDb))
 		dnsLookup(dbGetRandomDomain(domainsDb), "A")
 
 		// sleep between calls to moderate the query rate
