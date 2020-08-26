@@ -36,6 +36,8 @@ type Noise struct {
 	Refresh      Duration `json:"refresh"`
 	MinPeriodRaw Duration `json:"minPeriod"`
 	MaxPeriodRaw Duration `json:"maxPeriod"`
+	IPv4         bool     `json:ipv4"`
+	IPv6         bool     `json:ipv6"`
 	MinPeriod    time.Duration
 	MaxPeriod    time.Duration
 }

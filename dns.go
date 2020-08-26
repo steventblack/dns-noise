@@ -168,12 +168,14 @@ func dnsQuery(q *dns.Msg, d string) (*dns.Msg, error) {
 		return nil, err
 	}
 
-	// assumes single query message
+	// assumes single query message; multiple query messages are best left as a theoretical possibility rather than actuality
 	if r.Rcode != dns.RcodeSuccess {
 		log.Printf("%v: %v; %v", dns.TypeToString[r.Question[0].Qtype], r.Question[0].Name, dns.RcodeToString[r.Rcode])
 		return r, nil
 	}
 
+	// note that AAAA queries may result in a response that has *no* RRs. this is the defined behavior ala RFC4074
+	// it signals there's no AAAA record but there *are* other record types for that domain
 	for _, a := range r.Answer {
 		switch a.(type) {
 		case *dns.A:

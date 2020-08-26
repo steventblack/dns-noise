@@ -55,11 +55,17 @@ func main() {
 			numDomains = dbNumDomains(domainsDb)
 		}
 
-		// fetch a random domain and issue a DNS query
-		dnsLookup(dbGetRandomDomain(domainsDb), "A")
-
 		// sleep between calls to moderate the query rate
 		time.Sleep(calcSleepPeriod(NoiseConfig))
+
+		// fetch a random domain and issue a DNS query
+		randomDomain := dbGetRandomDomain(domainsDb)
+		if NoiseConfig.Noise.IPv6 {
+			dnsLookup(randomDomain, "AAAA")
+		}
+		if NoiseConfig.Noise.IPv4 {
+			dnsLookup(randomDomain, "A")
+		}
 	}
 }
 
