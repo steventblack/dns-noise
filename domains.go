@@ -133,9 +133,15 @@ func checkSourceRefresh(s Source) bool {
 func refreshSources(db *sql.DB, sources []Source) {
 	for i, s := range sources {
 		// if timestamp has not been initialized, then set it
+		// fantastic subtlety in syntax here: while slices are passed in as a value, the contents of the slice are
+		// effectively passed in by ref. this means you can modify an *existing* slice entry but adding/removing an
+		// entry will not persist outside of scope. modifying the timestamp for an *existing* slice entry should
+		// persist. however, when the slice entry is returned from the range function, it is a *value* copy of the
+		// slice entry and NOT the original! this means any modification will NOT persist outside of scope if made
+		// against the copy returned by range. however, if you instead use the index value to access directly into
+		// the slice you can successfully modify the contents and have it persist. perfectly logical if not perfectly obvious.
 		if s.Timestamp.IsZero() {
 			sources[i].Timestamp = time.Now()
-			//			s.Timestamp = time.Now()
 			log.Printf("Initialized source '%s' refresh to %v", s.Label, s.Timestamp)
 		}
 
@@ -144,7 +150,6 @@ func refreshSources(db *sql.DB, sources []Source) {
 			dbLoadCSV(db, sourceFile.Name(), s.Label, s.Column)
 
 			sources[i].Timestamp = time.Now()
-			//			s.Timestamp = time.Now()
 		}
 	}
 }
