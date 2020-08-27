@@ -13,9 +13,6 @@ import (
 	"time"
 )
 
-var numDomains int
-
-//
 // Initializer for rand
 // Generates a better seed value than simply relying on a time value
 func init() {
