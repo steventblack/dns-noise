@@ -26,6 +26,7 @@ func dbOpen(path string) *sql.DB {
 }
 
 // dbCreateSchema will create the schema required for service operation.
+// It will drop the schema (if it exists) before creating the schema in order to minimize impact of future changes.
 func dbCreateSchema(db *sql.DB) {
 	// validate connection to database is still valid
 	err := db.Ping()
