@@ -6,7 +6,6 @@ package main
 
 import (
 	crypto_rand "crypto/rand"
-	"database/sql"
 	"encoding/binary"
 	"flag"
 	"log"
@@ -37,29 +36,27 @@ func main() {
 	// If reusing existing DB, skip the fetch and data import
 	// Note that this flag only impacts the *initial* fetch & data import cycle
 	// The database will still be refreshed every RefreshPeriod unless that is also disabled
-	var domainsDb *sql.DB
-	if NoiseFlags.ReuseDatabase {
-		log.Println("Reusing existing domains database")
-		domainsDb = dbOpen(NoiseConfig.Noise.DbPath)
-	} else {
-		noiseFile := fetchDomains(NoiseConfig.Sources[0].Url)
-		domainsDb = dbLoadDomains(NoiseConfig.Noise.DbPath, noiseFile)
+	db := dbOpen(NoiseConfig.Noise.DbPath)
+	if !NoiseFlags.ReuseDatabase {
+		dbCreateSchema(db)
+
+		for _, s := range NoiseConfig.Sources {
+			sourceFile := fetchDomains(s.Url)
+			dbLoadCSV(db, sourceFile.Name(), s.Label, s.Column)
+		}
 	}
-	numDomains = dbNumDomains(domainsDb)
 
 	// main loop
 	for {
 		// periodically check to see if sources need to be refreshed
-		// if there was a change, recompute the numDomains available
-		if refreshSources(NoiseConfig.Sources) {
-			numDomains = dbNumDomains(domainsDb)
-		}
+		refreshSources(db, NoiseConfig.Sources)
 
 		// sleep between calls to moderate the query rate
 		time.Sleep(calcSleepPeriod(NoiseConfig))
 
 		// fetch a random domain and issue a DNS query
-		randomDomain := dbGetRandomDomain(domainsDb)
+		//		randomDomain := dbGetRandomDomain(domainsDb)
+		randomDomain := dbGetRandomDomain(db)
 		if NoiseConfig.Noise.IPv6 {
 			dnsLookup(randomDomain, "AAAA")
 		}

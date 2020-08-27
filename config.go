@@ -45,6 +45,7 @@ type Noise struct {
 type Source struct {
 	Label      string   `json:"label"`
 	Url        string   `json:"url"`
+	Column     int      `json:"column"`
 	RefreshRaw Duration `json:"refresh"`
 	Refresh    time.Duration
 	Timestamp  time.Time

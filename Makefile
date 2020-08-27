@@ -19,7 +19,7 @@ INSTALL_DIR := $(HOME)/go/bin
 # Build specifics
 BINARY := dns-noise
 MODULE := github.com/steventblack/$(BINARY)
-MODULE_FILES := dns-noise.go domains.go pihole.go noisedb.go config.go dns.go
+MODULE_FILES := dns-noise.go domains.go pihole.go database.go config.go dns.go
 
 # Build (local)
 .PHONY: build
