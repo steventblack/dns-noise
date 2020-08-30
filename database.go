@@ -132,6 +132,9 @@ func dbPurgeData(db *sql.DB, label string) {
 	log.Printf("Deleted %d rows for label '%s'", numRows, label)
 }
 
+// dbCountRows returns the number of rows found in the Domains table.
+// It ignores the source label and simply returns the number available for use.
+// It is a fatal error if it is unable to access the database or query the Domains table.
 func dbCountRows(db *sql.DB) int {
 	// validate connection to database is still valid
 	err := db.Ping()
@@ -150,11 +153,13 @@ func dbCountRows(db *sql.DB) int {
 }
 
 // dbGetRandomDomain fetches a random domain from the database.
-func dbGetRandomDomain(db *sql.DB) string {
+// If it is unable to fetch a domain, it will return an error and the domain will be empty
+func dbGetRandomDomain(db *sql.DB) (string, error) {
 	// validate connection to database is still valid
 	err := db.Ping()
 	if err != nil {
-		log.Fatal(err)
+		log.Print(err)
+		return "", err
 	}
 
 	// There may be a large number of rows in the database which don't perform well
@@ -166,8 +171,9 @@ func dbGetRandomDomain(db *sql.DB) string {
 	var domain string
 	err = db.QueryRow("SELECT Domain FROM Domains LIMIT 1 OFFSET $1", offset).Scan(&domain)
 	if err != nil {
-		log.Fatal(err)
+		log.Print(err)
+		return "", err
 	}
 
-	return domain
+	return domain, nil
 }

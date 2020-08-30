@@ -52,13 +52,16 @@ func main() {
 		time.Sleep(calcSleepPeriod(NoiseConfig))
 
 		// fetch a random domain and issue a DNS query
-		//		randomDomain := dbGetRandomDomain(domainsDb)
-		randomDomain := dbGetRandomDomain(db)
-		if NoiseConfig.Noise.IPv6 {
-			dnsLookup(randomDomain, "AAAA")
-		}
-		if NoiseConfig.Noise.IPv4 {
-			dnsLookup(randomDomain, "A")
+		randomDomain, err := dbGetRandomDomain(db)
+		if err != nil {
+			log.Print(err)
+		} else {
+			if NoiseConfig.Noise.IPv6 {
+				dnsLookup(randomDomain, "AAAA")
+			}
+			if NoiseConfig.Noise.IPv4 {
+				dnsLookup(randomDomain, "A")
+			}
 		}
 	}
 }
