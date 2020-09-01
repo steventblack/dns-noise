@@ -2,8 +2,8 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"flag"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -32,37 +32,32 @@ type NameServer struct {
 }
 
 type Noise struct {
-	DbPath       string   `json:"dbPath"`
-	Refresh      Duration `json:"refresh"`
-	MinPeriodRaw Duration `json:"minPeriod"`
-	MaxPeriodRaw Duration `json:"maxPeriod"`
-	IPv4         bool     `json:ipv4"`
-	IPv6         bool     `json:ipv6"`
-	MinPeriod    time.Duration
-	MaxPeriod    time.Duration
+	DbPath    string   `json:"dbPath"`
+	Refresh   Duration `json:"refresh"`
+	MinPeriod Duration `json:"minPeriod"`
+	MaxPeriod Duration `json:"maxPeriod"`
+	IPv4      bool     `json:ipv4"`
+	IPv6      bool     `json:ipv6"`
 }
 
 type Source struct {
-	Label      string   `json:"label"`
-	Url        string   `json:"url"`
-	Column     int      `json:"column"`
-	RefreshRaw Duration `json:"refresh"`
-	Refresh    time.Duration
-	Timestamp  time.Time
+	Label     string   `json:"label"`
+	Url       string   `json:"url"`
+	Column    int      `json:"column"`
+	Refresh   Duration `json:"refresh"`
+	Timestamp time.Time
 }
 
 type Pihole struct {
-	Host              string   `json:"host"`
-	AuthToken         string   `json:"authToken"`
-	ActivityPeriodRaw Duration `json:"activityPeriod"`
-	RefreshRaw        Duration `json:"refresh"`
-	Filter            string   `json:"filter"`
-	NoisePercentage   int      `json:"noisePercentage"`
-	Enabled           bool
-	ActivityPeriod    time.Duration
-	Refresh           time.Duration
-	Timestamp         time.Time
-	SleepPeriod       time.Duration
+	Host            string   `json:"host"`
+	AuthToken       string   `json:"authToken"`
+	ActivityPeriod  Duration `json:"activityPeriod"`
+	Refresh         Duration `json:"refresh"`
+	Filter          string   `json:"filter"`
+	NoisePercentage int      `json:"noisePercentage"`
+	Enabled         bool
+	Timestamp       time.Time
+	SleepPeriod     time.Duration
 }
 
 var NoiseFlags *Flags
@@ -125,21 +120,12 @@ func loadConfig(confFile string) {
 	// checks to see if necessary elements for Pihole access are present
 	c.Pihole.Enabled = piholeEnabled(&c.Pihole)
 
-	// proactively convert types to avoid having to explicitly typecast everywhere else in code
-	c.Noise.MinPeriod = time.Duration(c.Noise.MinPeriodRaw)
-	c.Noise.MaxPeriod = time.Duration(c.Noise.MaxPeriodRaw)
-	c.Pihole.ActivityPeriod = time.Duration(c.Pihole.ActivityPeriodRaw)
-	c.Pihole.Refresh = time.Duration(c.Pihole.RefreshRaw)
-	for i := range c.Sources {
-		c.Sources[i].Refresh = time.Duration(c.Sources[i].RefreshRaw)
-	}
-
 	// overwrite config vars that were set explicitly with a command-line flag
 	if isFlagPassed("min") {
-		c.Noise.MinPeriod = NoiseFlags.MinPeriod
+		c.Noise.MinPeriod = Duration(NoiseFlags.MinPeriod)
 	}
 	if isFlagPassed("max") {
-		c.Noise.MaxPeriod = NoiseFlags.MaxPeriod
+		c.Noise.MaxPeriod = Duration(NoiseFlags.MaxPeriod)
 	}
 	if isFlagPassed("database") || isFlagPassed("d") {
 		c.Noise.DbPath = NoiseFlags.DbPath
@@ -172,8 +158,15 @@ func piholeEnabled(p *Pihole) bool {
 	return enabled
 }
 
-// Duration provides a type enabling the JSON module to process strings as time.Durations.
+// The Duration type provides enables the JSON module to process strings as time.Durations.
+// While time.Duration is available as a native type for CLI flags, it is not for the JSON parser.
 type Duration time.Duration
+
+// Duration returns the time.Duration native type of the time module.
+// This helper function makes it slightly less tedious to continually typecast a Duration into a time.Duration
+func (d Duration) Duration() time.Duration {
+	return time.Duration(d)
+}
 
 // MarshalJSON supplies an interface for processing Duration values which wrap the standard time.Duration type.
 // It returns a byte array and any error encountered.
@@ -202,6 +195,6 @@ func (d *Duration) UnmarshalJSON(b []byte) error {
 		*d = Duration(tmp)
 		return nil
 	default:
-		return errors.New("invalid duration")
+		return fmt.Errorf("Invalid Duration specification: '%v'", value)
 	}
 }

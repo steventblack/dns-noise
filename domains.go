@@ -120,7 +120,7 @@ func unzipFile(zipFile *os.File) *os.File {
 func checkSourceRefresh(s Source) bool {
 	refresh := false
 
-	if s.Refresh != 0 && time.Since(s.Timestamp) > time.Duration(s.Refresh) {
+	if s.Refresh != 0 && time.Since(s.Timestamp) > s.Refresh.Duration() {
 		log.Printf("Refreshing domains source '%s'", s.Label)
 		refresh = true
 	}
@@ -132,7 +132,8 @@ func checkSourceRefresh(s Source) bool {
 // It will fetch a new datafile from the source and reload the database for each dataset that needs refreshing.
 func refreshSources(db *sql.DB, sources []Source) {
 	for i, s := range sources {
-		// if timestamp has not been initialized, then set it
+		// if timestamp has not been initialized, then set it and continue. do *not* refresh the database if
+		// the timestamp has not been set in order to avoid nuking the database if the -r flag has been used.
 		// fantastic subtlety in syntax here: while slices are passed in as a value, the contents of the slice are
 		// effectively passed in by ref. this means you can modify an *existing* slice entry but adding/removing an
 		// entry will not persist outside of scope. modifying the timestamp for an *existing* slice entry should
@@ -143,6 +144,7 @@ func refreshSources(db *sql.DB, sources []Source) {
 		if s.Timestamp.IsZero() {
 			sources[i].Timestamp = time.Now()
 			log.Printf("Initialized source '%s' refresh to %v", s.Label, s.Timestamp)
+			continue
 		}
 
 		if checkSourceRefresh(s) {

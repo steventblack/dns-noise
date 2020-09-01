@@ -75,7 +75,8 @@ func calcSleepPeriod(c *Config) time.Duration {
 	var sleepPeriod time.Duration
 
 	if c.Pihole.Enabled {
-		if time.Since(c.Pihole.Timestamp) > c.Pihole.Refresh {
+		//		if time.Since(c.Pihole.Timestamp) > c.Pihole.Refresh {
+		if time.Since(c.Pihole.Timestamp) > c.Pihole.Refresh.Duration() {
 			if c.Pihole.Timestamp.IsZero() {
 				log.Println("Initialized pihole timestamp")
 				c.Pihole.Timestamp = time.Now()
@@ -83,18 +84,19 @@ func calcSleepPeriod(c *Config) time.Duration {
 
 			// if no activity, an error will be returned
 			numQueries, err := piholeFetchActivity(&c.Pihole)
-			log.Printf("Refreshed pihole activity data; %.2f qps", float64(numQueries)/c.Pihole.ActivityPeriod.Seconds())
+			//			log.Printf("Refreshed pihole activity data; %.2f qps", float64(numQueries)/c.Pihole.ActivityPeriod.Seconds())
+			log.Printf("Refreshed pihole activity data; %.2f qps", float64(numQueries)/c.Pihole.ActivityPeriod.Duration().Seconds())
 			if err != nil {
 				c.Pihole.SleepPeriod = time.Duration(0)
 			} else {
-				c.Pihole.SleepPeriod = time.Duration(int64(c.Pihole.ActivityPeriod) * int64(c.Pihole.NoisePercentage) / int64(numQueries))
+				c.Pihole.SleepPeriod = time.Duration(int64(c.Pihole.ActivityPeriod.Duration()) * int64(c.Pihole.NoisePercentage) / int64(numQueries))
 			}
 
 			// if the interval time calculate by pihole activity exceeds limits, then cap appropriately
-			if c.Pihole.SleepPeriod > c.Noise.MaxPeriod {
-				c.Pihole.SleepPeriod = c.Noise.MaxPeriod
-			} else if c.Pihole.SleepPeriod < c.Noise.MinPeriod {
-				c.Pihole.SleepPeriod = c.Noise.MinPeriod
+			if c.Pihole.SleepPeriod > c.Noise.MaxPeriod.Duration() {
+				c.Pihole.SleepPeriod = c.Noise.MaxPeriod.Duration()
+			} else if c.Pihole.SleepPeriod < c.Noise.MinPeriod.Duration() {
+				c.Pihole.SleepPeriod = c.Noise.MinPeriod.Duration()
 			}
 
 			c.Pihole.Timestamp = time.Now()
@@ -102,8 +104,8 @@ func calcSleepPeriod(c *Config) time.Duration {
 
 		sleepPeriod = c.Pihole.SleepPeriod
 	} else {
-		sleepRange := int64(c.Noise.MaxPeriod - c.Noise.MinPeriod)
-		sleepPeriod = time.Duration(math_rand.Int63n(sleepRange)) + c.Noise.MinPeriod
+		sleepRange := int64(c.Noise.MaxPeriod.Duration() - c.Noise.MinPeriod.Duration())
+		sleepPeriod = time.Duration(math_rand.Int63n(sleepRange)) + c.Noise.MinPeriod.Duration()
 	}
 
 	sleepDelta := time.Duration(math_rand.Int63n(sleepPeriod.Milliseconds()/10)) * time.Millisecond
