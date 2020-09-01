@@ -7,7 +7,6 @@ package main
 import (
 	crypto_rand "crypto/rand"
 	"encoding/binary"
-	"flag"
 	"log"
 	math_rand "math/rand"
 	"time"
@@ -26,8 +25,9 @@ func init() {
 
 func main() {
 	// Read in all (any) of the command line flags
-	flag.Parse()
-	NoiseConfig := loadConfig(NoiseFlags.ConfigFile)
+	//	flag.Parse()
+	NoiseFlags := loadFlags()
+	NoiseConfig := loadConfig(NoiseFlags)
 	dnsServerConfig(NoiseConfig.NameServers)
 
 	// If reusing existing DB, skip the fetch and data import

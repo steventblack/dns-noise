@@ -60,11 +60,10 @@ type Pihole struct {
 	SleepPeriod     time.Duration
 }
 
-var NoiseFlags *Flags
-
-// init establishes the flag set and initializes the flags to their default values.
-// These values will be replaced if an explicit flag is passed on the command line.
-func init() {
+// loadFlags parses the CLI arguments passed into the Flags structure.
+// Unrecognized flags will be ignored.
+// An initialized Flags struct will be returned which contains either the passed in values or defaults.
+func loadFlags() *Flags {
 	f := new(Flags)
 
 	// set default interval values
@@ -81,9 +80,10 @@ func init() {
 	flag.DurationVar(&f.MinPeriod, "min", f.MinPeriod, "Minimum time period for issuing noise queries")
 	flag.DurationVar(&f.MaxPeriod, "max", f.MaxPeriod, "Maximum time period for issuing noise queries")
 
-	// Set public pointer
-	NoiseFlags = f
-	log.Println("Flags successfully initialized")
+	// process the flags passed in on the CLI
+	flag.Parse()
+
+	return f
 }
 
 // isFlagPassed checks to see if the named flag was explicitly passed on the command line or not.
@@ -102,8 +102,8 @@ func isFlagPassed(flagName string) bool {
 // loadConfig reads in and parses the named file for the configuration values.
 // The file is expected to be in JSON format. Command line flags will overwrite the values (if any) found in the configuration.
 // If successful, the processed configuration will be returned. If an error is encountered, it will be treated as a fatal error.
-func loadConfig(confFile string) *Config {
-	jsonFile, err := os.Open(confFile)
+func loadConfig(flags *Flags) *Config {
+	jsonFile, err := os.Open(flags.ConfigFile)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
@@ -122,13 +122,13 @@ func loadConfig(confFile string) *Config {
 
 	// overwrite config vars that were set explicitly with a command-line flag
 	if isFlagPassed("min") {
-		c.Noise.MinPeriod = Duration(NoiseFlags.MinPeriod)
+		c.Noise.MinPeriod = Duration(flags.MinPeriod)
 	}
 	if isFlagPassed("max") {
-		c.Noise.MaxPeriod = Duration(NoiseFlags.MaxPeriod)
+		c.Noise.MaxPeriod = Duration(flags.MaxPeriod)
 	}
 	if isFlagPassed("database") || isFlagPassed("d") {
-		c.Noise.DbPath = NoiseFlags.DbPath
+		c.Noise.DbPath = flags.DbPath
 	}
 
 	// bad config! no soup for you!
