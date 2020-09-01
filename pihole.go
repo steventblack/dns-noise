@@ -77,3 +77,22 @@ func piholeFilterNoise(filter string, queries [][]string) int {
 
 	return numQueries
 }
+
+// piholeEnabled checks the necessary settings are present in the config for pihole utilization.
+// It does not perform any validation checks on the setting values.
+// It returns a bool reflecting the configuration is setup or not.
+func piholeEnabled(p *Pihole) bool {
+	enabled := true
+
+	if p.Host == "" {
+		enabled = false
+	}
+	if p.AuthToken == "" {
+		enabled = false
+	}
+	if p.NoisePercentage <= 0 {
+		enabled = false
+	}
+
+	return enabled
+}
