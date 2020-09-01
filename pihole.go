@@ -25,7 +25,6 @@ type PiholeQueries struct {
 // On error, it returns a value of 0.
 func piholeFetchActivity(p *Pihole) (int, error) {
 	until := time.Now().Unix()
-	//	from := until - int64(p.ActivityPeriod.Seconds())
 	from := until - int64(p.ActivityPeriod.Duration().Seconds())
 
 	// Time values need to be expressed in Unix epoch time format
