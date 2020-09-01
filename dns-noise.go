@@ -27,7 +27,7 @@ func init() {
 func main() {
 	// Read in all (any) of the command line flags
 	flag.Parse()
-	loadConfig(NoiseFlags.ConfigFile)
+	NoiseConfig := loadConfig(NoiseFlags.ConfigFile)
 	dnsServerConfig(NoiseConfig.NameServers)
 
 	// If reusing existing DB, skip the fetch and data import

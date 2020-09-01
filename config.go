@@ -61,7 +61,6 @@ type Pihole struct {
 }
 
 var NoiseFlags *Flags
-var NoiseConfig *Config
 
 // init establishes the flag set and initializes the flags to their default values.
 // These values will be replaced if an explicit flag is passed on the command line.
@@ -102,7 +101,8 @@ func isFlagPassed(flagName string) bool {
 
 // loadConfig reads in and parses the named file for the configuration values.
 // The file is expected to be in JSON format. Command line flags will overwrite the values (if any) found in the configuration.
-func loadConfig(confFile string) {
+// If successful, the processed configuration will be returned. If an error is encountered, it will be treated as a fatal error.
+func loadConfig(confFile string) *Config {
 	jsonFile, err := os.Open(confFile)
 	if err != nil {
 		log.Fatal(err.Error())
@@ -136,7 +136,7 @@ func loadConfig(confFile string) {
 		log.Fatal("Min period exceeds max period")
 	}
 
-	NoiseConfig = c
+	return c
 }
 
 // The Duration type provides enables the JSON module to process strings as time.Durations.
