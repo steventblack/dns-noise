@@ -18,6 +18,105 @@ type Flags struct {
 	MaxPeriod     time.Duration
 }
 
+/*
+Config contains the configuration information used by the application for customizing its behavior.
+The configuration file defaults to a JSON-encoded file named "dns-noise.json" in the current working directory.
+It may be overridden by supplying an alternative filepath using the '-c' or '--conf' command-line option.
+  e.g. dns-noise -c /usr/local/etc/dns-noise.conf
+The configuration must be expressed as strict JSON, so unfortunately comments in the configuration file are not
+supported. JSON has an especially unforgiving syntax structure, so careful attention to the brackets, braces, and commas
+is necessary. An example configuration file is included which may be edited/revised as desired.
+
+Here is an annotated reference for the configuration file format:
+
+{
+  The "nameservers" block is *optional* and if omitted the system defaults will be used.
+  It contains a list of nameservers that will be queried with the noise DNS requests.
+  The nameservers will be queried in the order written with the primary used for all initial queries
+  and any additional nameservers used only on failover.
+  *  Each nameserver entry *must* contain an "ip" element with an IP address in either IPv4 or IPv6 format.
+  *  A nameserver entry *may* contain a "port" element with the connection port specified.
+     The default port (53) will be used if no port is specified.
+  *  A nameserver entry *may* contain a "zone" element *only* with an IPv6 address. The default is to leave the zone unspecified.
+
+  "nameservers":[
+    { "ip": "127.0.0.1", "port": 53 },
+    { "ip": "::1", zone: "eth0", "port": 53 }
+  ],
+
+  The "sources" block is *required* and must have at least one entry defining the source and interpretation rules.
+  A source provides a list of domains that will be randomly selected for querying the DNS servers in order to generate noise.
+  Each source describes the URL, how to interpret the data, and the refresh policy. All data files must be in CSV form,
+  although the application can independently unzip the file if necessary.
+  *  Each source entry *must* contain a "url" element specifying the URL for the domains data.
+  *  A source *may* contain a "column" element indicating which column in the data file contains the list of domains.
+     If unspecified, the default value is 0 which will specify the first column.
+  *  A source *may* contain a "label" element to uniquely identify the dataset associated with the source.
+     If unspecified, the entire dataset for all sources will be purged when a refresh is triggered.
+  *  A source *may* contain a "refresh" element specifying the interval for the domains data to be reloaded from the URL.
+     If unspecified, the default behavior will be to never refresh. The interval must be parsable by Go's time.ParseDuration().
+
+  "sources": [
+    { "url": "http://example.com/domains/domainlist.csv.zip", "column": 1, "label": "source1", "refresh": "24h" }
+  ],
+
+  The "noise" block is *optional* and if omitted the system defaults will be used.
+  It contains a set of attributes that define how the application behaves.
+  * The "minPeriod" element specifies the minimum interval  permitted for queries. The default value is 100ms.
+    A command-line argument specifying the minPeriod will override the default or configuration value.
+    The period must be parsable by Go's time.ParseDuration() and be less than that of the maxPeriod.
+  * The "maxPeriod" element specifies the maximum interval permitted for queries. The default value is 15s.
+    A command-line argument specifying the maxPeriod will override the default or configuration value.
+    The period must be parsable by Go's time.ParseDuration() and be greater than that of minPeriod.
+  * The "dbPath" element specifies the path to locate the database containing the list of domains.
+    The default location is in the system's tempory directory with the filename of "dns-noise.db".
+    The location must have permissions for file creation and write access.
+    A command-line argument specifying the path will override the default or configuration value.
+  * The "ipv4" element is a boolean flag indicating whether DNS request for the IPv4 address should be utilized.
+    This is a request for the "A" record from the DNS zone and is not dependent on using an IPv4 or IPv6 network.
+    The default value is true.
+  * The "ipv6" element is a boolean flag indicating whether DNS request for the IPv6 address should be utilized.
+    This is a request for the "AAAA" record from the DNS zone and is not dependent on using an IPv4 or IPv6 network.
+    The default value is true.
+
+  "noise": {
+    "minPeriod": "100ms",
+    "maxPeriod": "15s",
+    "dbPath": "/tmp/dns-noise.db",
+    "ipv4": true,
+    "ipv6": true
+  },
+
+  The "pihole" block is *optional* and if omitted the application will not utilize pihole activity for determining noise thresholds.
+  If the pihole block is incomplete or incorrectly configured, the pihole will not be utilized. If the pihole is not
+  used to determine the rate of DNS queries, then random values between the minPeriod and maxPeriod will be used. The pihole
+  authtoken value can be found in the "/etc/pihole/setupVars.conf" file as the value for the "WEBPASSWORD" option. The
+  token should be treated with appropriate security precautions and restrict access.
+  * The "host" element specifies the hostname or IP address of the pihole server. The pihole must be listening on that interface,
+    so check the pihole settings especially if running the noise generator on the same host as the pihole.
+    If the host is not specified, pihole activity will not be enabled.
+  * The "authToken" element contains the encrypted web password for accessing the pihole's admin API. Please note that the queries
+    to the pihole are sent *unencrypted* and the token value is accessible to traffic sniffers as the pihole does not support https.
+    Do *not* use if there is even a remote chance of untrusted actors on the network.
+  * The "activityPeriod" specifies the time interval used to calculate the running average for the pihole query activity.
+    It defaults to a 5 minute window. The interval must be parsable by Go's time.ParseDuration().
+  * The "refresh" element specifies the frequency the pihole will be queried to calculate the moving average.
+    The default refresh frequency is 1 minute. The frequency must be parsable by Go's time.ParseDuration().
+  * The "filter" element is *optional* and should specify a hostname that is used to exclude activity from the moving average.
+    This may be desired in order to exclude the queries originating form the DNS noise host in order to just report on the "real" traffic.
+  * The "noisePercentagle" element is *required* and must be in the range of 1-100 for the pihole functionality to be enabled.
+    The default value is 10. Do not include a percentage sign (%) with the value.
+
+  "pihole": {
+    "host": "pihole.example.com",
+    "authToken": "pihole_authtoken_goes_here",
+    "activityPeriod": "5m",
+    "refresh": "1m",
+    "filter": "noise.example.com",
+    "noisePercentage": 10
+  }
+}
+*/
 type Config struct {
 	NameServers []NameServer `json:"nameservers"`
 	Noise       Noise        `json:"noise"`
@@ -68,7 +167,7 @@ func loadFlags() *Flags {
 
 	// set default interval values
 	f.MinPeriod, _ = time.ParseDuration("100ms")
-	f.MaxPeriod, _ = time.ParseDuration("10000ms")
+	f.MaxPeriod, _ = time.ParseDuration("15000ms")
 
 	// Duplicate references are permitted for providing long ("--conf") and short ("-c") version of a command line arg
 	flag.BoolVar(&f.ReuseDatabase, "reusedb", false, "Reuse existing noise database")
