@@ -143,7 +143,7 @@ func refreshSources(db *sql.DB, sources []Source) {
 		// the slice you can successfully modify the contents and have it persist. perfectly logical if not perfectly obvious.
 		if s.Timestamp.IsZero() {
 			sources[i].Timestamp = time.Now()
-			log.Printf("Initialized source '%s' refresh to %v", s.Label, s.Timestamp)
+			log.Printf("Initialized source '%s' refresh to %v", s.Label, sources[i].Timestamp)
 			continue
 		}
 
