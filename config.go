@@ -159,8 +159,8 @@ type Noise struct {
 func (n *Noise) UnmarshalJSON(data []byte) error {
 	n.IPv4 = true
 	n.DbPath = filepath.Join(os.TempDir(), "dns-noise.db")
-	n.MinPeriod, _ = n.MinPeriod.ParseDuration("100ms")
-	n.MaxPeriod, _ = n.MaxPeriod.ParseDuration("15s")
+	n.MinPeriod, _ = parseDuration("100ms")
+	n.MaxPeriod, _ = parseDuration("15s")
 
 	// Need to avoid circular looping here
 	type Alias Noise
@@ -194,8 +194,8 @@ type Pihole struct {
 // The default values will be overwritten if present in the JSON blob.
 func (p *Pihole) UnmarshalJSON(data []byte) error {
 	p.NoisePercentage = 10
-	p.ActivityPeriod, _ = p.ActivityPeriod.ParseDuration("5m")
-	p.Refresh, _ = p.Refresh.ParseDuration("1m")
+	p.ActivityPeriod, _ = parseDuration("5m")
+	p.Refresh, _ = parseDuration("1m")
 
 	// Need to avoid circular looping here
 	type Alias Pihole
@@ -293,8 +293,8 @@ func (d Duration) Duration() time.Duration {
 	return time.Duration(d)
 }
 
-// Parse is a helper function to parse a string utilizing the underlying time.ParseDuration functionality.
-func (d Duration) ParseDuration(s string) (Duration, error) {
+// ParseDuration is a helper function to parse a string utilizing the underlying time.ParseDuration functionality.
+func parseDuration(s string) (Duration, error) {
 	td, err := time.ParseDuration(s)
 	if err != nil {
 		return Duration(0), err
