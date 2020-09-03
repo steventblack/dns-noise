@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -21,7 +22,7 @@ type Flags struct {
 /*
 Config contains the configuration information used by the application for customizing its behavior.
 The configuration file defaults to a JSON-encoded file named "dns-noise.json" in the current working directory.
-It may be overridden by supplying an alternative filepath using the '-c' or '--conf' command-line option.
+It may be overwritten by supplying an alternative filepath using the '-c' or '--conf' command-line option.
   e.g. dns-noise -c /usr/local/etc/dns-noise.conf
 The configuration must be expressed as strict JSON, so unfortunately comments in the configuration file are not
 supported. JSON has an especially unforgiving syntax structure, so careful attention to the brackets, braces, and commas
@@ -63,21 +64,21 @@ Here is an annotated reference for the configuration file format:
   The "noise" block is *optional* and if omitted the system defaults will be used.
   It contains a set of attributes that define how the application behaves.
   * The "minPeriod" element specifies the minimum interval  permitted for queries. The default value is 100ms.
-    A command-line argument specifying the minPeriod will override the default or configuration value.
+    A command-line argument specifying the minPeriod will overwrite the default or configuration value.
     The period must be parsable by Go's time.ParseDuration() and be less than that of the maxPeriod.
   * The "maxPeriod" element specifies the maximum interval permitted for queries. The default value is 15s.
-    A command-line argument specifying the maxPeriod will override the default or configuration value.
+    A command-line argument specifying the maxPeriod will overwrite the default or configuration value.
     The period must be parsable by Go's time.ParseDuration() and be greater than that of minPeriod.
   * The "dbPath" element specifies the path to locate the database containing the list of domains.
     The default location is in the system's tempory directory with the filename of "dns-noise.db".
     The location must have permissions for file creation and write access.
-    A command-line argument specifying the path will override the default or configuration value.
+    A command-line argument specifying the path will overwrite the default or configuration value.
   * The "ipv4" element is a boolean flag indicating whether DNS request for the IPv4 address should be utilized.
     This is a request for the "A" record from the DNS zone and is not dependent on using an IPv4 or IPv6 network.
     The default value is true.
   * The "ipv6" element is a boolean flag indicating whether DNS request for the IPv6 address should be utilized.
     This is a request for the "AAAA" record from the DNS zone and is not dependent on using an IPv4 or IPv6 network.
-    The default value is true.
+    The default value is false.
 
   "noise": {
     "minPeriod": "100ms",
@@ -92,19 +93,20 @@ Here is an annotated reference for the configuration file format:
   used to determine the rate of DNS queries, then random values between the minPeriod and maxPeriod will be used. The pihole
   authtoken value can be found in the "/etc/pihole/setupVars.conf" file as the value for the "WEBPASSWORD" option. The
   token should be treated with appropriate security precautions and restrict access.
-  * The "host" element specifies the hostname or IP address of the pihole server. The pihole must be listening on that interface,
+  * The "host" element *must* specify the hostname or IP address of the pihole server. The pihole must be listening on that interface,
     so check the pihole settings especially if running the noise generator on the same host as the pihole.
     If the host is not specified, pihole activity will not be enabled.
-  * The "authToken" element contains the encrypted web password for accessing the pihole's admin API. Please note that the queries
+  * The "authToken" element *must* contain the encrypted web password for accessing the pihole's admin API. Please note that the queries
     to the pihole are sent *unencrypted* and the token value is accessible to traffic sniffers as the pihole does not support https.
     Do *not* use if there is even a remote chance of untrusted actors on the network.
-  * The "activityPeriod" specifies the time interval used to calculate the running average for the pihole query activity.
-    It defaults to a 5 minute window. The interval must be parsable by Go's time.ParseDuration().
-  * The "refresh" element specifies the frequency the pihole will be queried to calculate the moving average.
+  * The "activityPeriod" element *may* specify the time interval used to calculate the running average for the pihole query activity.
+    The default is use a 5 minute window for examining query activity. The interval must be parsable by Go's time.ParseDuration().
+  * The "refresh" element *may* specify the frequency the pihole will be queried to calculate the moving average.
     The default refresh frequency is 1 minute. The frequency must be parsable by Go's time.ParseDuration().
-  * The "filter" element is *optional* and should specify a hostname that is used to exclude activity from the moving average.
-    This may be desired in order to exclude the queries originating form the DNS noise host in order to just report on the "real" traffic.
-  * The "noisePercentagle" element is *required* and must be in the range of 1-100 for the pihole functionality to be enabled.
+  * The "filter" element *may* specify a hostname that is used to exclude activity from the moving average.
+    This may be desired in order to exclude the queries originating from the DNS noise host in order to just report on the "live" traffic.
+  * The "noisePercentage" element *may* be specified and must be in the range of 1-100 for the pihole functionality to be enabled.
+    This element allows the noise generator to dynamically adjust its traffic levels to the stated percentage of "live" traffic.
     The default value is 10. Do not include a percentage sign (%) with the value.
 
   "pihole": {
@@ -130,13 +132,41 @@ type NameServer struct {
 	Port int    `json:"port"`
 }
 
+// UnmarshalJSON provides an interface for customized processing of the NameServer struct.
+// It performs initialization of select fields to default values prior to the actual unmarshaling.
+// The default values will be overwritten if present in the JSON blob.
+func (ns *NameServer) UnmarshalJSON(data []byte) error {
+	ns.Port = 53
+
+	// Need to avoid circular looping here
+	type Alias NameServer
+	tmp := (*Alias)(ns)
+
+	return json.Unmarshal(data, tmp)
+}
+
 type Noise struct {
 	DbPath    string   `json:"dbPath"`
-	Refresh   Duration `json:"refresh"`
 	MinPeriod Duration `json:"minPeriod"`
 	MaxPeriod Duration `json:"maxPeriod"`
 	IPv4      bool     `json:ipv4"`
 	IPv6      bool     `json:ipv6"`
+}
+
+// UnmarshalJSON provides an interface for customized processing of the Noise struct.
+// It performs initialization of select fields to default values prior to the actual unmarshaling.
+// The default values will be overwritten if present in the JSON blob.
+func (n *Noise) UnmarshalJSON(data []byte) error {
+	n.IPv4 = true
+	n.DbPath = filepath.Join(os.TempDir(), "dns-noise.db")
+	n.MinPeriod, _ = n.MinPeriod.ParseDuration("100ms")
+	n.MaxPeriod, _ = n.MaxPeriod.ParseDuration("15s")
+
+	// Need to avoid circular looping here
+	type Alias Noise
+	tmp := (*Alias)(n)
+
+	return json.Unmarshal(data, tmp)
 }
 
 type Source struct {
@@ -157,6 +187,21 @@ type Pihole struct {
 	Enabled         bool
 	Timestamp       time.Time
 	SleepPeriod     time.Duration
+}
+
+// UnmarshalJSON provides an interface for customized processing of the Pihole struct.
+// It performs initialization of select fields to default values prior to the actual unmarshaling.
+// The default values will be overwritten if present in the JSON blob.
+func (p *Pihole) UnmarshalJSON(data []byte) error {
+	p.NoisePercentage = 10
+	p.ActivityPeriod, _ = p.ActivityPeriod.ParseDuration("5m")
+	p.Refresh, _ = p.Refresh.ParseDuration("1m")
+
+	// Need to avoid circular looping here
+	type Alias Pihole
+	tmp := (*Alias)(p)
+
+	return json.Unmarshal(data, tmp)
 }
 
 // loadFlags parses the CLI arguments passed into the Flags structure.
@@ -246,6 +291,16 @@ type Duration time.Duration
 // This helper function makes it slightly less tedious to continually typecast a Duration into a time.Duration
 func (d Duration) Duration() time.Duration {
 	return time.Duration(d)
+}
+
+// Parse is a helper function to parse a string utilizing the underlying time.ParseDuration functionality.
+func (d Duration) ParseDuration(s string) (Duration, error) {
+	td, err := time.ParseDuration(s)
+	if err != nil {
+		return Duration(0), err
+	}
+
+	return Duration(td), nil
 }
 
 // MarshalJSON supplies an interface for processing Duration values which wrap the standard time.Duration type.
