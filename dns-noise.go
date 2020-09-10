@@ -24,20 +24,24 @@ func init() {
 }
 
 func main() {
-	// Read in all (any) of the command line flags
-	//	flag.Parse()
-	NoiseFlags := loadFlags()
-	NoiseConfig := loadConfig(NoiseFlags)
-	dnsServerConfig(NoiseConfig.NameServers)
+	flags := loadFlags()
+	conf := loadConfig(flags)
 
+	dnsServerConfig(conf.NameServers)
+	metricsConfig(&conf.Metrics)
+
+	makeNoise(conf, flags.ReuseDatabase)
+}
+
+func makeNoise(conf *Config, reuseDb bool) {
 	// If reusing existing DB, skip the fetch and data import
 	// Note that this flag only impacts the *initial* fetch & data import cycle
 	// The database will still be refreshed every RefreshPeriod unless that is also disabled
-	db := dbOpen(NoiseConfig.Noise.DbPath)
-	if !NoiseFlags.ReuseDatabase {
+	db := dbOpen(conf.Noise.DbPath)
+	if !reuseDb {
 		dbCreateSchema(db)
 
-		for _, s := range NoiseConfig.Sources {
+		for _, s := range conf.Sources {
 			sourceFile := fetchDomains(s.Url)
 			dbLoadCSV(db, sourceFile.Name(), s.Label, s.Column)
 		}
@@ -46,20 +50,20 @@ func main() {
 	// main loop
 	for {
 		// periodically check to see if sources need to be refreshed
-		refreshSources(db, NoiseConfig.Sources)
+		refreshSources(db, conf.Sources)
 
 		// sleep between calls to moderate the query rate
-		time.Sleep(calcSleepPeriod(NoiseConfig))
+		time.Sleep(calcSleepPeriod(conf))
 
 		// fetch a random domain and issue a DNS query
 		randomDomain, err := dbGetRandomDomain(db)
 		if err != nil {
 			log.Print(err)
 		} else {
-			if NoiseConfig.Noise.IPv6 {
+			if conf.Noise.IPv6 {
 				dnsLookup(randomDomain, "AAAA")
 			}
-			if NoiseConfig.Noise.IPv4 {
+			if conf.Noise.IPv4 {
 				dnsLookup(randomDomain, "A")
 			}
 		}

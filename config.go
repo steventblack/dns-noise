@@ -124,6 +124,7 @@ type Config struct {
 	Noise       Noise        `json:"noise"`
 	Sources     []Source     `json:"sources"`
 	Pihole      Pihole       `json:"pihole"`
+	Metrics     Metrics      `json:"metrics"`
 }
 
 type NameServer struct {
@@ -200,6 +201,26 @@ func (p *Pihole) UnmarshalJSON(data []byte) error {
 	// Need to avoid circular looping here
 	type Alias Pihole
 	tmp := (*Alias)(p)
+
+	return json.Unmarshal(data, tmp)
+}
+
+type Metrics struct {
+	Enabled bool   `json:"enabled"`
+	Path    string `json:"path"`
+	Port    int    `json:"port"`
+}
+
+// UnmarshalJSON provides an interface for customized processing of the Metrics struct.
+// It performs initialization of select fields to default values prior to the actual unmarshaling.
+// The default values will be overwritten if present in the JSON blob.
+func (m *Metrics) UnmarshalJSON(data []byte) error {
+	m.Port = 6001
+	m.Enabled = false
+	m.Path = "metrics"
+
+	type Alias Metrics
+	tmp := (*Alias)(m)
 
 	return json.Unmarshal(data, tmp)
 }
@@ -285,6 +306,8 @@ func loadConfig(flags *Flags) *Config {
 
 // The Duration type provides enables the JSON module to process strings as time.Durations.
 // While time.Duration is available as a native type for CLI flags, it is not for the JSON parser.
+// Note that in Go, you cannot define new methods on a non-local type so this workaround is the
+// best alternative to hacking directly in the standard Go time module.
 type Duration time.Duration
 
 // Duration returns the time.Duration native type of the time module.
