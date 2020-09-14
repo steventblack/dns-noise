@@ -17,7 +17,7 @@ var (
 	dnsReqVec = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "dns_noise_request",
 		Help: "The total number of DNS requests issued."},
-		[]string{"type", "server"})
+		[]string{"type", "server", "rcode"})
 
 	dnsRespVec = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "dns_noise_response",
@@ -31,11 +31,11 @@ var (
 		[]string{"type", "server"})
 )
 
-func metricsDnsReq(label, server string) {
+func metricsDnsReq(label, server, rcode string) {
 	dnsReqVec.WithLabelValues(label, server).Inc()
 }
 
-func metricsDnsResp(label, rcode, server string) {
+func metricsDnsResp(label, server, rcode string) {
 	dnsRespVec.WithLabelValues(label, rcode, server).Inc()
 }
 

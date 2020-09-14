@@ -149,8 +149,6 @@ func dnsLookup(domain, msgType string) {
 	// try each dns server if a connection error is encountered
 	// server response codes (e.g. NXDOMAIN) are *not* considered errors
 	for _, d := range dnsServers {
-		metricsDnsReq(dns.TypeToString[t], d)
-
 		_, err := dnsQuery(q, d)
 		if err != nil {
 			log.Print(err.Error())
@@ -174,9 +172,12 @@ func dnsQuery(q *dns.Msg, d string) (*dns.Msg, error) {
 		return nil, err
 	}
 
+	// need to associate the rcode with the original query type and server info
+	metricsDnsReq(dns.TypeToString[q.Question[0].Qtype], d, dns.RcodeToString[r.Rcode])
+
 	// assumes single query message; multiple query messages are best left as a theoretical possibility rather than actuality
 	if r.Rcode != dns.RcodeSuccess {
-		metricsDnsResp(dns.TypeToString[r.Question[0].Qtype], dns.RcodeToString[r.Rcode], d)
+		metricsDnsResp(dns.TypeToString[r.Question[0].Qtype], d, dns.RcodeToString[r.Rcode])
 		log.Printf("%v: %v; %v", dns.TypeToString[r.Question[0].Qtype], r.Question[0].Name, dns.RcodeToString[r.Rcode])
 		return r, nil
 	}
@@ -184,7 +185,7 @@ func dnsQuery(q *dns.Msg, d string) (*dns.Msg, error) {
 	// note that AAAA queries may result in a response that has *no* RRs. this is the defined behavior ala RFC4074
 	// it signals there's no AAAA record but there *are* other record types for that domain
 	for _, a := range r.Answer {
-		metricsDnsResp(dns.TypeToString[a.Header().Rrtype], dns.RcodeToString[r.Rcode], d)
+		metricsDnsResp(dns.TypeToString[a.Header().Rrtype], d, dns.RcodeToString[r.Rcode])
 
 		// omit log for each record received; may reenable later with a logging level option
 		/*
