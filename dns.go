@@ -9,8 +9,9 @@ import (
 	"github.com/miekg/dns"
 	"log"
 	"net"
-	"reflect"
+	//	"reflect"
 	"strings"
+	"time"
 )
 
 // dnsServers contain the address(es) of the DNS servers to query.
@@ -149,7 +150,11 @@ func dnsLookup(domain, msgType string) {
 	// server response codes (e.g. NXDOMAIN) are *not* considered errors
 	for _, d := range dnsServers {
 		metricsDnsReq(dns.TypeToString[t], d)
+
+		// wrap the query with a timer for latency stats
+		start := time.Now()
 		_, err := dnsQuery(q, d)
+		metricsDnsRespTime(float64(time.Since(start).Milliseconds()), dns.TypeToString[t], d)
 		if err != nil {
 			log.Print(err.Error())
 			continue
@@ -171,7 +176,7 @@ func dnsQuery(q *dns.Msg, d string) (*dns.Msg, error) {
 
 	// assumes single query message; multiple query messages are best left as a theoretical possibility rather than actuality
 	if r.Rcode != dns.RcodeSuccess {
-		metricsDnsResp(dns.TypeToString[r.Question[0].Qtype], dns.RcodeToString[r.Rcode])
+		metricsDnsResp(dns.TypeToString[r.Question[0].Qtype], dns.RcodeToString[r.Rcode], d)
 		log.Printf("%v: %v; %v", dns.TypeToString[r.Question[0].Qtype], r.Question[0].Name, dns.RcodeToString[r.Rcode])
 		return r, nil
 	}
@@ -179,24 +184,27 @@ func dnsQuery(q *dns.Msg, d string) (*dns.Msg, error) {
 	// note that AAAA queries may result in a response that has *no* RRs. this is the defined behavior ala RFC4074
 	// it signals there's no AAAA record but there *are* other record types for that domain
 	for _, a := range r.Answer {
-		metricsDnsResp(dns.TypeToString[a.Header().Rrtype], dns.RcodeToString[r.Rcode])
+		metricsDnsResp(dns.TypeToString[a.Header().Rrtype], dns.RcodeToString[r.Rcode], d)
 
-		switch a.(type) {
-		case *dns.A:
-			rr := a.(*dns.A)
-			log.Printf("%v: %v->%v; %v", dns.TypeToString[rr.Header().Rrtype], q.Question[0].Name, rr.A, dns.RcodeToString[r.Rcode])
-		case *dns.AAAA:
-			rr := a.(*dns.AAAA)
-			log.Printf("%v: %v->%v; %v", dns.TypeToString[rr.Header().Rrtype], q.Question[0].Name, rr.AAAA, dns.RcodeToString[r.Rcode])
-		case *dns.CNAME:
-			rr := a.(*dns.CNAME)
-			log.Printf("%v: %v->%v; %v", dns.TypeToString[rr.Header().Rrtype], q.Question[0].Name, rr.Target, dns.RcodeToString[r.Rcode])
-		case *dns.MX:
-			rr := a.(*dns.MX)
-			log.Printf("%v: %v->%v; %v", dns.TypeToString[rr.Header().Rrtype], q.Question[0].Name, rr.Mx, dns.RcodeToString[r.Rcode])
-		default:
-			log.Printf("%v: Unexpected answer type", reflect.TypeOf(a))
-		}
+		// omit log for each record received; may reenable later with a logging level option
+		/*
+			switch a.(type) {
+			case *dns.A:
+				rr := a.(*dns.A)
+				log.Printf("%v: %v->%v; %v", dns.TypeToString[rr.Header().Rrtype], q.Question[0].Name, rr.A, dns.RcodeToString[r.Rcode])
+			case *dns.AAAA:
+				rr := a.(*dns.AAAA)
+				log.Printf("%v: %v->%v; %v", dns.TypeToString[rr.Header().Rrtype], q.Question[0].Name, rr.AAAA, dns.RcodeToString[r.Rcode])
+			case *dns.CNAME:
+				rr := a.(*dns.CNAME)
+				log.Printf("%v: %v->%v; %v", dns.TypeToString[rr.Header().Rrtype], q.Question[0].Name, rr.Target, dns.RcodeToString[r.Rcode])
+			case *dns.MX:
+				rr := a.(*dns.MX)
+				log.Printf("%v: %v->%v; %v", dns.TypeToString[rr.Header().Rrtype], q.Question[0].Name, rr.Mx, dns.RcodeToString[r.Rcode])
+			default:
+				log.Printf("%v: Unexpected answer type", reflect.TypeOf(a))
+			}
+		*/
 	}
 
 	return r, nil

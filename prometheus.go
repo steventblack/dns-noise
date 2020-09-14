@@ -21,16 +21,26 @@ var (
 
 	dnsRespVec = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "dns_noise_response",
-		Help: "The total number of DNS records received"},
-		[]string{"type", "rcode"})
+		Help: "The total number of DNS records received."},
+		[]string{"type", "rcode", "server"})
+
+	dnsRespTimeVec = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    "dns_noise_responsetime",
+		Help:    "The response times for DNS queries.",
+		Buckets: prometheus.LinearBuckets(1, 50, 15)},
+		[]string{"type", "server"})
 )
 
 func metricsDnsReq(label, server string) {
 	dnsReqVec.WithLabelValues(label, server).Inc()
 }
 
-func metricsDnsResp(label, rcode string) {
-	dnsRespVec.WithLabelValues(label, rcode).Inc()
+func metricsDnsResp(label, rcode, server string) {
+	dnsRespVec.WithLabelValues(label, rcode, server).Inc()
+}
+
+func metricsDnsRespTime(dur float64, label, server string) {
+	dnsRespTimeVec.WithLabelValues(label, server).Observe(dur)
 }
 
 func metricsConfig(conf *Metrics) {

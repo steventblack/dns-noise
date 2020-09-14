@@ -117,6 +117,22 @@ Here is an annotated reference for the configuration file format:
     "filter": "noise.example.com",
     "noisePercentage": 10
   }
+
+	The "metrics" block is *optional* and if omitted the application will not emit any metrics for scraping.
+	If the metrics block is incorrectly formatted, it may result in a panic upon service launch or difficulty in scraping.
+	The metrics are exported on the designated port and path in standard prometheus text format. They can be manually
+	inspected by pointing your browser to the apprporiate URL. (e.g. "http://noise.example.com:6001/metrics")
+  * The "enabled" element *may* be specified with a boolean (true/false) value. The default value is false.
+  * The "port" element *may* be specified. The default value is 6001. Care should be made when selecting a port
+    to pick a port that is not already in use on that host or in a restricted range.
+  *	The "path" element *may* be specified. The default value is "/metrics" as that is the convential path for Prometheus
+   	log scraping. Access to the path should be restricted to external networks as part of good security practices.
+
+	"metrics": {
+		"enabled": false,
+		"port": 6001,
+		"path": "/metrics"
+	}
 }
 */
 type Config struct {
