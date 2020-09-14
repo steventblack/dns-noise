@@ -151,10 +151,7 @@ func dnsLookup(domain, msgType string) {
 	for _, d := range dnsServers {
 		metricsDnsReq(dns.TypeToString[t], d)
 
-		// wrap the query with a timer for latency stats
-		start := time.Now()
 		_, err := dnsQuery(q, d)
-		metricsDnsRespTime(float64(time.Since(start).Milliseconds()), dns.TypeToString[t], d)
 		if err != nil {
 			log.Print(err.Error())
 			continue
@@ -169,7 +166,10 @@ func dnsLookup(domain, msgType string) {
 // If there is a problem querying the server, nil is returned with a descriptive error.
 // Note that this supports only a single query per server request.
 func dnsQuery(q *dns.Msg, d string) (*dns.Msg, error) {
+	// wrap the query with a timer for latency stats
+	start := time.Now()
 	r, err := dns.Exchange(q, d)
+	metricsDnsRespTime(float64(time.Since(start).Milliseconds()), dns.TypeToString[q.Question[0].Qtype], d)
 	if err != nil {
 		return nil, err
 	}

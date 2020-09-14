@@ -27,7 +27,7 @@ var (
 	dnsRespTimeVec = promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Name:    "dns_noise_responsetime",
 		Help:    "The response times for DNS queries.",
-		Buckets: prometheus.LinearBuckets(1, 50, 15)},
+		Buckets: prometheus.LinearBuckets(50, 50, 15)},
 		[]string{"type", "server"})
 )
 
