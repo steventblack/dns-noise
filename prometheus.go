@@ -22,7 +22,7 @@ var (
 	dnsRespVec = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "dns_noise_response",
 		Help: "The total number of DNS records received."},
-		[]string{"type", "rcode", "server"})
+		[]string{"type", "server", "rcode"})
 
 	dnsRespTimeVec = promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Name:    "dns_noise_responsetime",
@@ -32,11 +32,11 @@ var (
 )
 
 func metricsDnsReq(label, server, rcode string) {
-	dnsReqVec.WithLabelValues(label, server).Inc()
+	dnsReqVec.WithLabelValues(label, server, rcode).Inc()
 }
 
 func metricsDnsResp(label, server, rcode string) {
-	dnsRespVec.WithLabelValues(label, rcode, server).Inc()
+	dnsRespVec.WithLabelValues(label, server, rcode).Inc()
 }
 
 func metricsDnsRespTime(dur float64, label, server string) {
