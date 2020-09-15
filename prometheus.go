@@ -29,6 +29,12 @@ var (
 		Help:    "The response times for DNS queries.",
 		Buckets: prometheus.LinearBuckets(50, 50, 15)},
 		[]string{"type", "server"})
+
+	// note: not a vector!
+	dnsPiholeRate = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "dns_noise_pihole_qps",
+		Help: "Pihole query rate (adjusted after filtering).",
+	})
 )
 
 func metricsDnsReq(label, server, rcode string) {
@@ -41,6 +47,10 @@ func metricsDnsResp(label, server, rcode string) {
 
 func metricsDnsRespTime(dur float64, label, server string) {
 	dnsRespTimeVec.WithLabelValues(label, server).Observe(dur)
+}
+
+func metricsDnsPiholeRate(rate float64) {
+	dnsPiholeRate.Set(rate)
 }
 
 func metricsConfig(conf *Metrics) {
