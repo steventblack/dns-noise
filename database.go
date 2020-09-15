@@ -149,6 +149,8 @@ func dbCountRows(db *sql.DB) int {
 		log.Fatal(err)
 	}
 
+	metricsDnsNoiseDomains(float64(numRows))
+
 	return numRows
 }
 

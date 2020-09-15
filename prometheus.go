@@ -35,6 +35,11 @@ var (
 		Name: "dns_noise_pihole_qps",
 		Help: "Pihole query rate (adjusted after filtering).",
 	})
+
+	dnsNoiseDomains = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "dns_noise_domains",
+		Help: "The total number of noise domains available.",
+	})
 )
 
 func metricsDnsReq(label, server, rcode string) {
@@ -51,6 +56,10 @@ func metricsDnsRespTime(dur float64, label, server string) {
 
 func metricsDnsPiholeRate(rate float64) {
 	dnsPiholeRate.Set(rate)
+}
+
+func metricsDnsNoiseDomains(num float64) {
+	dnsNoiseDomains.Set(num)
 }
 
 func metricsConfig(conf *Metrics) {
