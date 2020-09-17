@@ -32,7 +32,7 @@ func piholeFetchActivity(p *Pihole) (int, error) {
 
 	response, err := http.Get(url)
 	if err != nil {
-		return 0, fmt.Errorf("Unable to fetch activity data from '%s'; status '%s'", p.Host, response.Status)
+		return 0, err
 	}
 	defer response.Body.Close()
 
